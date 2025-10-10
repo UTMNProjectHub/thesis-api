@@ -1,0 +1,1 @@
+ALTER TABLE "auth"."users" ALTER COLUMN "date_created" SET DATA TYPE timestamp;
