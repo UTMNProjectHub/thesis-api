@@ -11,12 +11,9 @@ RUN apt-get update && \
 
 RUN bun install
 
-COPY prisma prisma
 COPY src src
 COPY tsconfig.json .
 # COPY public public
-
-RUN bun prisma generate
 
 ENV NODE_ENV production
 CMD ["bun", "src/index.ts"]
