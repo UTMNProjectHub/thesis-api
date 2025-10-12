@@ -5,6 +5,7 @@ import { AuthModel } from "./model";
 import { DrizzleQueryError } from "drizzle-orm";
 import postgres from "postgres";
 import { bearer } from "@elysiajs/bearer";
+import { access } from "fs/promises";
 
 export const auth = new Elysia()
   .use(
@@ -19,16 +20,25 @@ export const auth = new Elysia()
   .use(AuthModel)
   .post(
     "/register",
-    async ({ jwt, status, body: { email, password }, service, set }) => {
+    async ({
+      jwt,
+      status,
+      body: { email, password },
+      service,
+      set,
+      cookie: { refreshToken },
+    }) => {
       const result = await service.createUser(email, password);
 
-      const refresh_token = await jwt.sign({ sub: result.id, exp: "14d" });
+      const jwtRefreshToken = await jwt.sign({ sub: result.id, exp: "14d" });
+      const accessToken = await jwt.sign({ sub: result.id });
 
-      const access_token = await jwt.sign({ sub: result.id });
+      refreshToken.set({
+        value: jwtRefreshToken,
+        httpOnly: true,
+      });
 
-      set.headers["authorization"] = `Bearer ${access_token}`;
-
-      return status(201, { ...result, refresh_token: refresh_token });
+      return status(201, { ...result, accessToken });
     },
     {
       response: {
@@ -52,7 +62,14 @@ export const auth = new Elysia()
   )
   .post(
     "/login",
-    async ({ jwt, body: { email, password }, service, set, headers }) => {
+    async ({
+      jwt,
+      body: { email, password },
+      service,
+      set,
+      headers,
+      cookie: { refreshToken },
+    }) => {
       const data = await service.loginUser(email, password);
 
       const refresh_token = await jwt.sign({ sub: data.id, exp: "14d" });
@@ -63,11 +80,14 @@ export const auth = new Elysia()
         refresh_token,
       );
 
-      const access_token = await jwt.sign({ sub: data.id });
+      const accessToken = await jwt.sign({ sub: data.id });
 
-      set.headers["authorization"] = `Bearer ${access_token}`;
+      refreshToken.set({
+        value: refresh_token,
+        httpOnly: true,
+      });
 
-      return { ...data, refresh_token: refresh_token };
+      return { ...data, accessToken };
     },
     {
       body: "loginBody",
@@ -80,34 +100,41 @@ export const auth = new Elysia()
   )
   .get(
     "/refresh",
-    async ({ jwt, service, headers, set, bearer, status }) => {
-      const res = await jwt.verify(bearer).then((decoded) => {
-        if (decoded === false) {
-          throw status(401, "Unauthorized");
-        }
+    async ({
+      jwt,
+      service,
+      headers,
+      set,
+      bearer,
+      cookie: { refreshToken },
+    }) => {
+      const res = await jwt
+        .verify(refreshToken.value as string)
+        .then((decoded) => {
+          if (decoded === false) {
+            throw status(401, "Unauthorized");
+          }
 
-        return decoded.sub;
-      });
+          return decoded.sub;
+        });
 
-      const checkRefresh = await service.checkRefreshToken(
-        res as string,
-        headers["user-agent"] as string,
-        bearer as string,
-      );
-
-      if (checkRefresh) {
-        const access_token = jwt.sign({ sub: res as string });
+      if (res) {
+        const access_token = await jwt.sign({ sub: res as string });
 
         set.headers["authorization"] = `Bearer ${access_token}`;
 
-        return status(200, "OK");
+        return {
+          accessToken: access_token,
+        };
       }
 
       return status(500, "Internal Server Error");
     },
     {
       response: {
-        200: t.String(),
+        200: t.Object({
+          accessToken: t.String(),
+        }),
         401: t.String(),
         500: t.String(),
       },

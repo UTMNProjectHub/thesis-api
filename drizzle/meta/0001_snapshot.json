@@ -1,12 +1,190 @@
 {
-  "id": "0db802ef-7b6a-4766-91a4-ac84c15e2d65",
-  "prevId": "34087964-00e0-41f8-9f1d-274b854f1c8e",
+  "id": "72363419-1075-46fe-ba02-30d8f16c9641",
+  "prevId": "37a224eb-21ce-4463-a2e0-d9d7fa3896a0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "auth.users": {
+    "thesis.permission": {
+      "name": "permission",
+      "schema": "thesis",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "permission_id_seq",
+            "schema": "thesis",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_created": {
+          "name": "date_created",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "permission_slug_unique": {
+          "name": "permission_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "thesis.roles": {
+      "name": "roles",
+      "schema": "thesis",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "roles_id_seq",
+            "schema": "thesis",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_created": {
+          "name": "date_created",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "roles_slug_unique": {
+          "name": "roles_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "thesis.roles_permissions": {
+      "name": "roles_permissions",
+      "schema": "thesis",
+      "columns": {
+        "roleId": {
+          "name": "roleId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permissionId": {
+          "name": "permissionId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "roles_permissions_roleId_roles_id_fk": {
+          "name": "roles_permissions_roleId_roles_id_fk",
+          "tableFrom": "roles_permissions",
+          "tableTo": "roles",
+          "schemaTo": "thesis",
+          "columnsFrom": [
+            "roleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "roles_permissions_permissionId_permission_id_fk": {
+          "name": "roles_permissions_permissionId_permission_id_fk",
+          "tableFrom": "roles_permissions",
+          "tableTo": "permission",
+          "schemaTo": "thesis",
+          "columnsFrom": [
+            "permissionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "thesis.users": {
       "name": "users",
-      "schema": "auth",
+      "schema": "thesis",
       "columns": {
         "id": {
           "name": "id",
@@ -28,7 +206,7 @@
         },
         "date_created": {
           "name": "date_created",
-          "type": "date",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         }
@@ -48,11 +226,65 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "thesis.users_roles": {
+      "name": "users_roles",
+      "schema": "thesis",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "roleId": {
+          "name": "roleId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "users_roles_userId_users_id_fk": {
+          "name": "users_roles_userId_users_id_fk",
+          "tableFrom": "users_roles",
+          "tableTo": "users",
+          "schemaTo": "thesis",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "users_roles_roleId_roles_id_fk": {
+          "name": "users_roles_roleId_roles_id_fk",
+          "tableFrom": "users_roles",
+          "tableTo": "roles",
+          "schemaTo": "thesis",
+          "columnsFrom": [
+            "roleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {},
   "schemas": {
-    "auth": "auth"
+    "thesis": "thesis"
   },
   "sequences": {},
   "roles": {},

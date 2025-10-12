@@ -22,12 +22,18 @@ import jwt from "@elysiajs/jwt";
 import openapi from "@elysiajs/openapi";
 import { Elysia } from "elysia";
 import { auth } from "./modules/auth";
+import { user } from "./modules/user";
 import "./rpc";
+import { profile } from "./modules/profile";
+import cors from "@elysiajs/cors";
 
 const app = new Elysia({ prefix: "/api", precompile: true });
 
 app.use(openapi());
+app.use(cors());
 app.use(auth);
+app.use(user);
+app.use(profile);
 app.listen(parseInt(process.env.ELYSIA_PORT as string));
 
 console.log(

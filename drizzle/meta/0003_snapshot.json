@@ -1,6 +1,6 @@
 {
-  "id": "6b57cfe1-94a8-439d-800b-666faba56987",
-  "prevId": "72363419-1075-46fe-ba02-30d8f16c9641",
+  "id": "2918080a-593f-4408-8009-a69c7bc15bfe",
+  "prevId": "6b57cfe1-94a8-439d-800b-666faba56987",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -196,7 +196,7 @@
           "name": "email",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "full_name": {
           "name": "full_name",
@@ -214,13 +214,13 @@
           "name": "password",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "date_created": {
           "name": "date_created",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         }
       },
       "indexes": {},

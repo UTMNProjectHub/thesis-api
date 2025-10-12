@@ -58,6 +58,8 @@ export class AuthService {
       id: user.id,
       email: user.email,
       date_created: user.date_created,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
     };
   }
 
@@ -85,6 +87,8 @@ export class AuthService {
       id: user.id,
       email: user.email,
       date_created: user.date_created,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
     };
   }
 }

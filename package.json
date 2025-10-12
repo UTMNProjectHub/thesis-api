@@ -2,11 +2,13 @@
   "name": "auth-microservice",
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
     "@elysiajs/bearer": "^1.4.1",
+    "@elysiajs/cors": "^1.4.0",
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.11",
     "@grpc/grpc-js": "^1.10.0",
