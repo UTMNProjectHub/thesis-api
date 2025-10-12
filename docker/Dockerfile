@@ -12,6 +12,7 @@ RUN apt-get update && \
 RUN bun install
 
 COPY src src
+COPY proto proto
 COPY tsconfig.json .
 # COPY public public
 
