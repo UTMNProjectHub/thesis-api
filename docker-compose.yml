@@ -12,6 +12,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
     #    volumes:
     #      - ./src:/app/src:rw
     #      - ./package.json:/app/package.json:ro
