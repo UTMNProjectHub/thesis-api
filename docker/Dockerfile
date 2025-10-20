@@ -14,6 +14,7 @@ RUN bun install
 COPY src src
 COPY proto proto
 COPY tsconfig.json .
+COPY drizzle.config.ts .
 # COPY public public
 #
 RUN bunx drizzle-kit generate
