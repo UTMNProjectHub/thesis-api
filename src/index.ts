@@ -26,6 +26,9 @@ import { user } from "./modules/user";
 import "./rpc";
 import { profile } from "./modules/profile";
 import cors from "@elysiajs/cors";
+import { subject } from "./modules/subject";
+import { theme } from "./modules/themes";
+import { file } from "./modules/file";
 
 const app = new Elysia({ prefix: "/api", precompile: true });
 
@@ -34,6 +37,9 @@ app.use(cors());
 app.use(auth);
 app.use(user);
 app.use(profile);
+app.use(subject);
+app.use(theme);
+app.use(file);
 app.listen(parseInt(process.env.ELYSIA_PORT as string));
 
 console.log(

@@ -36,7 +36,7 @@ export class AuthService {
     return true;
   }
 
-  async createUser(email: string, password: string) {
+  async createUser(email: string, password: string, full_name: string) {
     const hashed = await Bun.password.hash(password);
 
     const userRecords = await db
@@ -44,6 +44,7 @@ export class AuthService {
       .values({
         email: email,
         password: hashed,
+        full_name: full_name,
         date_created: new Date(),
       })
       .returning();

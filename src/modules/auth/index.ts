@@ -23,12 +23,16 @@ export const auth = new Elysia()
     async ({
       jwt,
       status,
-      body: { email, password },
+      body: { email, password, full_name },
       service,
       set,
       cookie: { refreshToken },
     }) => {
-      const result = await service.createUser(email, password);
+      const result = await service.createUser(
+        email,
+        password,
+        full_name as string,
+      );
 
       const jwtRefreshToken = await jwt.sign({ sub: result.id, exp: "14d" });
       const accessToken = await jwt.sign({ sub: result.id });

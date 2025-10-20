@@ -5,29 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1760109983462,
-      "tag": "0000_amused_dark_beast",
+      "when": 1760536834368,
+      "tag": "0000_unknown_diamondback",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1760111589750,
-      "tag": "0001_workable_bishop",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1760117761431,
-      "tag": "0002_cultured_doctor_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1760117914848,
-      "tag": "0003_shiny_tyrannus",
+      "when": 1760613757353,
+      "tag": "0001_watery_grim_reaper",
       "breakpoints": true
     }
   ]

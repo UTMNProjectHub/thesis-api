@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
-import { users } from "../../db/schema";
+import { roles, users, usersToRoles } from "../../db/schema";
 import { status, t } from "elysia";
 import { UserModel } from "./model";
 
@@ -54,5 +54,24 @@ export class UserService {
     }
 
     return { ...updatedUser[0] };
+  }
+
+  async getUserRoles(userId: string) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      with: {
+        usersToRoles: {
+          with: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw status(404, "Not Found");
+    }
+
+    return user.usersToRoles.map((utr) => utr.role);
   }
 }
