@@ -15,6 +15,10 @@ COPY src src
 COPY proto proto
 COPY tsconfig.json .
 # COPY public public
+#
+RUN bunx drizzle-kit generate
+RUN bunx drizzle-kit migrate
+RUN bun run db:fill
 
 ENV NODE_ENV production
 CMD ["bun", "src/index.ts"]
