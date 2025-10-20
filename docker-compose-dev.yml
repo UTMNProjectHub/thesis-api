@@ -18,6 +18,8 @@ services:
       - ./package.json:/app/package.json:ro
       - ./tsconfig.json:/app/tsconfig.json:ro
       - ./node_modules:/app/node_modules
+    depends_on:
+      - minio
     command: ["bun", "--hot", "src/index.ts"]
   minio:
     image: minio/minio:latest

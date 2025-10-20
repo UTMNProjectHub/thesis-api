@@ -13,6 +13,7 @@ RUN bun install
 
 COPY src src
 COPY proto proto
+COPY drizzle drizzle
 COPY tsconfig.json .
 COPY drizzle.config.ts .
 COPY docker/entrypoint.sh /entrypoint.sh
