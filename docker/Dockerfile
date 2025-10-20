@@ -15,11 +15,11 @@ COPY src src
 COPY proto proto
 COPY tsconfig.json .
 COPY drizzle.config.ts .
+COPY docker/entrypoint.sh /entrypoint.sh
 # COPY public public
-#
-RUN bunx drizzle-kit generate
-RUN bunx drizzle-kit migrate
-RUN bun run db:fill
+
+RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV production
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bun", "src/index.ts"]
