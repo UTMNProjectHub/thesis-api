@@ -33,7 +33,14 @@ import { file } from "./modules/file";
 const app = new Elysia({ prefix: "/api", precompile: true });
 
 app.use(openapi());
-app.use(cors());
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV == "production"
+        ? /^https?:\/\/([a-z0-9-]+\.)*quizy\.saveitsky\.ru(?::\d+)?$/i
+        : true,
+  }),
+);
 app.use(auth);
 app.use(user);
 app.use(profile);
