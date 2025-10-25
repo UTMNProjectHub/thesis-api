@@ -77,13 +77,6 @@ export const auth = new Elysia()
       const data = await service.loginUser(email, password);
 
       const refresh_token = await jwt.sign({ sub: data.id, exp: "14d" });
-
-      await service.storeRefreshToken(
-        data.id,
-        headers["user-agent"] as string,
-        refresh_token,
-      );
-
       const accessToken = await jwt.sign({ sub: data.id });
 
       refreshToken.set({
