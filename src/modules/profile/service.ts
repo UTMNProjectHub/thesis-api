@@ -3,8 +3,17 @@ import { db } from "../../db";
 import { status } from "elysia";
 import { users } from "../../db/schema";
 import { eq } from "drizzle-orm";
+import { cache } from "../../db/redis";
 
 export class ProfileService {
+  private getUserCacheKey(userId: string): string {
+    return `user:${userId}:profile`;
+  }
+
+  private getUserRolesCacheKey(userId: string): string {
+    return `user:${userId}:roles`;
+  }
+
   async changeUserPassword(
     userId: string,
     old_password: string,
@@ -32,8 +41,22 @@ export class ProfileService {
 
     const hashed_pwd = await password.hash(new_password);
 
-    await db.update(users).set({
-      password: hashed_pwd,
-    });
+    await db
+      .update(users)
+      .set({
+        password: hashed_pwd,
+      })
+      .where(eq(users.id, userId));
+
+    await this.invalidateUserCache(userId);
+  }
+
+  async invalidateUserCache(userId: string) {
+    try {
+      await cache.del(this.getUserCacheKey(userId));
+      await cache.del(this.getUserRolesCacheKey(userId));
+    } catch (error) {
+      console.error("Error invalidating user cache:", error);
+    }
   }
 }
