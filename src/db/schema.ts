@@ -129,7 +129,7 @@ export const questions = thesisSchema.table("questions", {
   id: uuid()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  type: varchar().notNull(),
+  type: varchar().notNull(), // multichoice|truefalse|shortanswer|matching|cloze|essay|numerical|description
   text: text().notNull(),
 });
 
