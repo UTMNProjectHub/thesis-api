@@ -20,7 +20,7 @@ if (!process.env.REDIS_URL) {
 
 import jwt from "@elysiajs/jwt";
 import openapi from "@elysiajs/openapi";
-import { Elysia } from "elysia";
+import { Elysia, status } from "elysia";
 import { auth } from "./modules/auth";
 import { user } from "./modules/user";
 import "./rpc";
@@ -29,6 +29,7 @@ import cors from "@elysiajs/cors";
 import { subject } from "./modules/subject";
 import { theme } from "./modules/themes";
 import { file } from "./modules/file";
+import { quiz } from "./modules/quiz";
 
 const app = new Elysia({
   prefix: "/api",
@@ -63,36 +64,12 @@ app.use(profile);
 app.use(subject);
 app.use(theme);
 app.use(file);
+app.use(quiz);
 
 app.onError(({ error, code }) => {
   console.error(`[${code}]`, error);
 
-  if (code === "NOT_FOUND") {
-    return {
-      error: "Route not found",
-      statusCode: 404,
-    };
-  }
-
-  if (code === "VALIDATION") {
-    return {
-      error: "Validation failed",
-      statusCode: 422,
-      details: error.message,
-    };
-  }
-
-  if (code === "INTERNAL_SERVER_ERROR") {
-    return {
-      error: "Internal server error",
-      statusCode: 500,
-    };
-  }
-
-  return {
-    error: error instanceof Error ? error.message : "Unknown error",
-    statusCode: 500,
-  };
+  return error;
 });
 
 if (process.env.NODE_ENV !== "production") {

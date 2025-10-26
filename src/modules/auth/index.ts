@@ -51,17 +51,6 @@ export const auth = new Elysia()
         500: t.String(),
       },
       body: "registerBody",
-      error({ error }) {
-        if (error instanceof DrizzleQueryError) {
-          if (error.cause instanceof postgres.PostgresError) {
-            if (error.cause.constraint_name == "users_email_unique") {
-              return status(409, "User with this email already exists");
-            }
-          }
-        }
-
-        return status(500, "Internal Server Error");
-      },
     },
   )
   .post(
