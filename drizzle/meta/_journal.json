@@ -15,6 +15,13 @@
       "when": 1760613757353,
       "tag": "0001_watery_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762346487284,
+      "tag": "0002_lying_rogue",
+      "breakpoints": true
     }
   ]
 }

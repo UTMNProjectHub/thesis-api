@@ -8,6 +8,7 @@ import {
   integer,
   text,
   boolean,
+  json,
 } from "drizzle-orm/pg-core";
 
 export const thesisSchema = pgSchema("thesis");
@@ -129,7 +130,8 @@ export const questions = thesisSchema.table("questions", {
   id: uuid()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  type: varchar().notNull(), // multichoice|truefalse|shortanswer|matching|cloze|essay|numerical|description
+  type: varchar().notNull(), // multichoice|truefalse|shortanswer|matching|essay|numerical|description
+  multiAnswer: boolean(),
   text: text().notNull(),
 });
 
@@ -200,9 +202,9 @@ export const chosenVariants = thesisSchema.table("chosen_variants", {
   questionId: uuid()
     .notNull()
     .references(() => questions.id),
-  chosenId: uuid()
-    .notNull()
-    .references(() => questionsVariants.id),
+  chosenId: uuid().references(() => questionsVariants.id),
+  answer: json(),
+  isRight: boolean(),
 });
 
 export const chosenVariantsRelations = relations(chosenVariants, ({ one }) => ({

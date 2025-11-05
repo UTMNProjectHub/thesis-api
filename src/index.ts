@@ -30,6 +30,11 @@ import { subject } from "./modules/subject";
 import { theme } from "./modules/themes";
 import { file } from "./modules/file";
 import { quiz } from "./modules/quiz";
+import { question } from "./modules/question";
+import { opentelemetry } from "@elysiajs/opentelemetry";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import staticPlugin from "@elysiajs/static";
 
 const app = new Elysia({
   prefix: "/api",
@@ -40,7 +45,15 @@ const app = new Elysia({
   },
 });
 
-app.use(openapi());
+app.use(staticPlugin());
+
+app.use(
+  openapi({
+    scalar: {
+      favicon: "/public/favicon.ico",
+    },
+  }),
+);
 
 app.use(
   cors({
@@ -65,6 +78,7 @@ app.use(subject);
 app.use(theme);
 app.use(file);
 app.use(quiz);
+app.use(question);
 
 app.onError(({ error, code }) => {
   console.error(`[${code}]`, error);

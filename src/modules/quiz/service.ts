@@ -29,7 +29,7 @@ export class QuizService {
     return {
       ...quiz,
       quizesQuestions: undefined,
-      questions: quiz.quizesQuestions.map((qq) => qq.question),
+      questionCount: quiz.quizesQuestions.length
     };
   }
 

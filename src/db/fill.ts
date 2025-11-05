@@ -381,7 +381,7 @@ async function createMatchingQuestion(quizId: string, themeName: string) {
     const [variant] = await db
       .insert(variants)
       .values({
-        text: `${pair.left} → ${pair.right}`,
+        text: `${pair.left};${pair.right}`,
         explainRight: `Верно! ${pair.left} соответствует ${pair.right}`,
         explainWrong: `Неверно. Правильное соответствие: ${pair.left} → ${pair.right}`,
       })

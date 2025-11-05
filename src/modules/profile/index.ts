@@ -13,10 +13,8 @@ export const profile = new Elysia({ prefix: "/profile" })
   .decorate("profileService", new ProfileService())
   .get(
     "/",
-    async ({ userId, userService, status }) => {
-      const profile = await userService.getUserById(userId);
-
-      return profile;
+    async ({ userId, userService }) => {
+      return await userService.getUserById(userId);
     },
     {
       isAuth: true,

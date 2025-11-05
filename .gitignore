@@ -44,3 +44,5 @@ package-lock.json
 
 src/k6
 k6-results
+
+.idea/

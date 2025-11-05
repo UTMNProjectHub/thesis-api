@@ -19,7 +19,20 @@ export class UserService {
 
   async getUserById(userId: string) {
     const cacheKey = this.getUserCacheKey(userId);
-    const cached = await cache.get(cacheKey);
+    const cached = await cache.get<{
+      id: string;
+      email: string;
+      date_created: Date;
+      full_name: string | null;
+      avatar_url: string | null;
+      roles: Array<{
+        id: number;
+        title: string;
+        slug: string;
+        description: string | null;
+        date_created: Date | null;
+      }>;
+    }>(cacheKey);
 
     if (cached) {
       return cached;
