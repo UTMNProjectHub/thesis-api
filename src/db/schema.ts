@@ -30,6 +30,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   chosenVariants: many(chosenVariants),
   referencesQuiz: many(referencesQuiz),
   files: many(files),
+  quizSessions: many(quizSession),
 }));
 
 export const usersToRoles = thesisSchema.table("users_roles", {
@@ -124,6 +125,7 @@ export const quizesRelations = relations(quizes, ({ one, many }) => ({
   usersQuizes: many(usersQuizes),
   referencesQuiz: many(referencesQuiz),
   chosenVariants: many(chosenVariants),
+  quizSessions: many(quizSession),
 }));
 
 export const questions = thesisSchema.table("questions", {
@@ -189,13 +191,47 @@ export const usersQuizesRelations = relations(usersQuizes, ({ one }) => ({
   }),
 }));
 
+export const quizSession = thesisSchema.table("quiz_session", {
+  id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
+  quizId: uuid().notNull().references(() => quizes.id),
+  userId: uuid().notNull().references(() => users.id),
+  timeStart: timestamp(),
+  timeEnd: timestamp(),
+});
+
+export const quizSessionRelations = relations(quizSession, ({ one, many }) => ({
+  quiz: one(quizes, {
+    fields: [quizSession.quizId],
+    references: [quizes.id],
+  }),
+  user: one(users, {
+    fields: [quizSession.userId],
+    references: [users.id],
+  }),
+  sessionSubmits: many(sessionSubmits),
+}));
+
+export const sessionSubmits = thesisSchema.table("session_submits", {
+  id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sessionId: uuid().notNull().references(() => quizSession.id),
+  submitId: uuid().notNull().references(() => chosenVariants.id),
+});
+
+export const sessionSubmitsRelations = relations(sessionSubmits, ({ one }) => ({
+  session: one(quizSession, {
+    fields: [sessionSubmits.sessionId],
+    references: [quizSession.id],
+  }),
+  submit: one(chosenVariants, {
+    fields: [sessionSubmits.submitId],
+    references: [chosenVariants.id],
+  }),
+}));
+
 export const chosenVariants = thesisSchema.table("chosen_variants", {
   id: uuid()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  userId: uuid()
-    .notNull()
-    .references(() => users.id),
   quizId: uuid()
     .notNull()
     .references(() => quizes.id),
@@ -207,11 +243,7 @@ export const chosenVariants = thesisSchema.table("chosen_variants", {
   isRight: boolean(),
 });
 
-export const chosenVariantsRelations = relations(chosenVariants, ({ one }) => ({
-  user: one(users, {
-    fields: [chosenVariants.userId],
-    references: [users.id],
-  }),
+export const chosenVariantsRelations = relations(chosenVariants, ({ one, many }) => ({
   quiz: one(quizes, {
     fields: [chosenVariants.quizId],
     references: [quizes.id],
@@ -224,6 +256,7 @@ export const chosenVariantsRelations = relations(chosenVariants, ({ one }) => ({
     fields: [chosenVariants.chosenId],
     references: [questionsVariants.id],
   }),
+  sessionSubmits: many(sessionSubmits),
 }));
 
 export const variants = thesisSchema.table("variants", {

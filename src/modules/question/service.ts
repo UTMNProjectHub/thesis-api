@@ -7,8 +7,14 @@ import {
   variants,
 } from "../../db/schema";
 import { status } from "elysia";
+import { SessionService } from "../session/service";
 
 export class QuestionService {
+  private sessionService: SessionService;
+
+  constructor() {
+    this.sessionService = new SessionService();
+  }
   async getQuestion(id: string) {
     const questionQuery = await db.query.questions.findFirst({
       where: eq(questions.id, id),
@@ -106,17 +112,28 @@ export class QuestionService {
         );
       }
       return {
-        userId,
         quizId,
         questionId,
         chosenId: questionVariant.questionsVariantsId,
       };
     });
 
-    const submitQuery = await db
-      .insert(chosenVariants)
-      .values(chosenVariantsArr)
-      .execute();
+    const session = await this.sessionService.getActiveSessionOrThrow(userId, quizId);
+
+    const submittedVariants = await db.transaction(async (tx) => {
+      const inserted = await tx
+        .insert(chosenVariants)
+        .values(chosenVariantsArr)
+        .returning();
+
+      await this.sessionService.addSubmitsToSessionInTransaction(
+        tx,
+        session.id,
+        inserted.map((cv) => cv.id),
+      );
+
+      return inserted;
+    });
 
     // Get explanations for chosen variants
     const explanations = variantIds
@@ -306,17 +323,27 @@ export class QuestionService {
           })),
         };
 
-        // Save to DB with pairs data
-        const [submitted] = await db
-          .insert(chosenVariants)
-          .values({
-            userId,
-            quizId,
-            questionId,
-            answer: answerData,
-            isRight,
-          })
-          .returning();
+        const session = await this.sessionService.getActiveSessionOrThrow(userId, quizId);
+
+        const [submitted] = await db.transaction(async (tx) => {
+          const [inserted] = await tx
+            .insert(chosenVariants)
+            .values({
+              quizId,
+              questionId,
+              answer: answerData,
+              isRight,
+            })
+            .returning();
+
+          await this.sessionService.addSubmitsToSessionInTransaction(
+            tx,
+            session.id,
+            [inserted.id],
+          );
+
+          return [inserted];
+        });
 
         return {
           question: questionQuery,
@@ -331,16 +358,27 @@ export class QuestionService {
         break;
     }
 
-    const [submitted] = await db
-      .insert(chosenVariants)
-      .values({
-        userId,
-        quizId,
-        questionId,
-        answer: { text: answerText.trim() },
-        isRight,
-      })
-      .returning();
+    const session = await this.sessionService.getActiveSessionOrThrow(userId, quizId);
+
+    const [submitted] = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(chosenVariants)
+        .values({
+          quizId,
+          questionId,
+          answer: { text: answerText.trim() },
+          isRight,
+        })
+        .returning();
+
+      await this.sessionService.addSubmitsToSessionInTransaction(
+        tx,
+        session.id,
+        [inserted.id],
+      );
+
+      return [inserted];
+    });
 
     return {
       question: questionQuery,
