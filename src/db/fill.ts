@@ -353,46 +353,94 @@ async function createMatchingQuestion(quizId: string, themeName: string) {
     {
       left: "int",
       right: "42",
-      isCorrect: true,
+      explainRight: "Верно! int соответствует 42",
+      explainWrong: "Неверно. Правильное соответствие: int → 42",
     },
     {
       left: "str",
       right: "'Hello'",
-      isCorrect: true,
+      explainRight: "Верно! str соответствует 'Hello'",
+      explainWrong: "Неверно. Правильное соответствие: str → 'Hello'",
     },
     {
       left: "list",
       right: "[1, 2, 3]",
-      isCorrect: true,
+      explainRight: "Верно! list соответствует [1, 2, 3]",
+      explainWrong: "Неверно. Правильное соответствие: list → [1, 2, 3]",
     },
     {
       left: "dict",
       right: "{'key': 'value'}",
-      isCorrect: true,
+      explainRight: "Верно! dict соответствует {'key': 'value'}",
+      explainWrong: "Неверно. Правильное соответствие: dict → {'key': 'value'}",
     },
     {
       left: "bool",
       right: "True",
-      isCorrect: true,
+      explainRight: "Верно! bool соответствует True",
+      explainWrong: "Неверно. Правильное соответствие: bool → True",
     },
   ];
 
+  // Create variants for left and right items
+  const leftVariants: Array<{ id: string; text: string; explainRight?: string; explainWrong?: string }> = [];
+  const rightVariants: Array<{ id: string; text: string; explainRight?: string; explainWrong?: string }> = [];
+
   for (const pair of pairs) {
-    const [variant] = await db
+    // Create left variant
+    const [leftVariant] = await db
       .insert(variants)
       .values({
-        text: `${pair.left};${pair.right}`,
-        explainRight: `Верно! ${pair.left} соответствует ${pair.right}`,
-        explainWrong: `Неверно. Правильное соответствие: ${pair.left} → ${pair.right}`,
+        text: pair.left,
+        explainRight: pair.explainRight,
+        explainWrong: pair.explainWrong,
       })
       .returning();
 
-    await db.insert(questionsVariants).values({
-      questionId: question.id,
-      variantId: variant.id,
-      isRight: pair.isCorrect,
+    // Create right variant
+    const [rightVariant] = await db
+      .insert(variants)
+      .values({
+        text: pair.right,
+        explainRight: pair.explainRight,
+        explainWrong: pair.explainWrong,
+      })
+      .returning();
+
+    leftVariants.push({
+      id: leftVariant.id,
+      text: leftVariant.text,
+      explainRight: leftVariant.explainRight || undefined,
+      explainWrong: leftVariant.explainWrong || undefined,
+    });
+
+    rightVariants.push({
+      id: rightVariant.id,
+      text: rightVariant.text,
+      explainRight: rightVariant.explainRight || undefined,
+      explainWrong: rightVariant.explainWrong || undefined,
     });
   }
+
+  // Create matching config
+  const matchingConfig = {
+    leftItems: leftVariants,
+    rightItems: rightVariants,
+    correctPairs: pairs.map((pair, index) => ({
+      leftVariantId: leftVariants[index].id,
+      rightVariantId: rightVariants[index].id,
+      explainRight: pair.explainRight,
+      explainWrong: pair.explainWrong,
+    })),
+  };
+
+  // Insert matching config into questions_variants
+  await db.insert(questionsVariants).values({
+    questionId: question.id,
+    variantId: null,
+    isRight: null,
+    matchingConfig: matchingConfig,
+  });
 }
 
 async function createNumericalQuestion(quizId: string, themeName: string) {

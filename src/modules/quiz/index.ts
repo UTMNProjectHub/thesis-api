@@ -32,7 +32,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         if (session.userId !== userId) {
           throw status(403, "Forbidden");
         }
-        return await quizService.getQuestionsByQuizId(id);
+        return await quizService.getQuestionsByQuizId(id, activeSessionId, userId);
       }
 
       const { questions } = await quizService.startQuizSessionAndGetQuestions(userId, id);

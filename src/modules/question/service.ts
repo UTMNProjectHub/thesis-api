@@ -8,6 +8,7 @@ import {
 } from "../../db/schema";
 import { status } from "elysia";
 import { SessionService } from "../session/service";
+import type { MatchingConfig } from "./utils";
 
 export class QuestionService {
   private sessionService: SessionService;
@@ -240,73 +241,90 @@ export class QuestionService {
           );
         }
 
-        // "key:value;key:value"
+        // Load matching config from questions_variants
+        const matchingConfigRecord = await db.query.questionsVariants.findFirst({
+          where: eq(questionsVariants.questionId, questionId),
+          with: {
+            question: true,
+          },
+        });
+
+        if (!matchingConfigRecord?.matchingConfig) {
+          throw status(
+            500,
+            "Internal Server Error: matching config not found for this question",
+          );
+        }
+
+        const matchingConfig = matchingConfigRecord.matchingConfig as MatchingConfig;
+
+        // Parse answer: "leftVariantId:rightVariantId;leftVariantId:rightVariantId"
         const answerPairs = answerText
           .trim()
           .split(";")
           .filter((pair) => pair.trim() !== "")
           .map((pair) => {
-            const [key, value] = pair.split(":").map((s) => s.trim());
-            return { key, value };
+            const [leftVariantId, rightVariantId] = pair.split(":").map((s) => s.trim());
+            return { leftVariantId, rightVariantId };
           })
-          .filter((pair) => pair.key && pair.value);
+          .filter((pair) => pair.leftVariantId && pair.rightVariantId);
 
         if (answerPairs.length === 0) {
           throw status(
             400,
-            "Bad Request: matching question answer must be in format 'key:value;key:value;'",
+            "Bad Request: matching question answer must be in format 'leftVariantId:rightVariantId;leftVariantId:rightVariantId;'",
           );
         }
 
-        // Get all correct pairs from variants (format: "left;right")
-        const correctPairs = variantsQuery
-          .filter((v) => v.isRight === true && v.text)
-          .map((v) => {
-            const [left, right] = v.text!.split(";").map((s) => s.trim());
-            return { left, right, variant: v };
-          })
-          .filter((p) => p.left && p.right);
-
-        // Create pairs with isRight status and find corresponding variant for explanation
+        // Check each pair against correctPairs
         const pairsWithStatus = answerPairs.map((answerPair) => {
-          // Check if this pair matches any correct pair
-          const matchingCorrectPair = correctPairs.find(
-            (correctPair) =>
-              correctPair.left === answerPair.key &&
-              correctPair.right === answerPair.value,
+          // Find matching correct pair
+          const correctPair = matchingConfig.correctPairs.find(
+            (cp) =>
+              cp.leftVariantId === answerPair.leftVariantId &&
+              cp.rightVariantId === answerPair.rightVariantId,
           );
 
-          const isPairRight = !!matchingCorrectPair;
-          let variant = matchingCorrectPair?.variant;
+          const isPairRight = !!correctPair;
 
-          // If pair is wrong, try to find variant with the same key (left) for explanation
-          if (!isPairRight && !variant) {
-            const variantWithSameKey = variantsQuery.find(
-              (v) => v.text && v.text.split(";")[0]?.trim() === answerPair.key,
+          // Get left and right item texts for response
+          const leftItem = matchingConfig.leftItems.find(
+            (li) => li.variantId === answerPair.leftVariantId,
+          );
+          const rightItem = matchingConfig.rightItems.find(
+            (ri) => ri.variantId === answerPair.rightVariantId,
+          );
+
+          // Get explanation from correct pair or from items
+          let explanation: string | null = null;
+          if (isPairRight && correctPair) {
+            explanation = correctPair.explainRight || leftItem?.explainRight || rightItem?.explainRight || null;
+          } else {
+            // Find the correct pair for this left item to show what was wrong
+            const correctPairForLeft = matchingConfig.correctPairs.find(
+              (cp) => cp.leftVariantId === answerPair.leftVariantId,
             );
-            variant = variantWithSameKey || undefined;
+            if (correctPairForLeft) {
+              explanation = correctPairForLeft.explainWrong || leftItem?.explainWrong || rightItem?.explainWrong || null;
+            }
           }
 
           return {
-            key: answerPair.key,
-            value: answerPair.value,
+            key: leftItem?.text || answerPair.leftVariantId,
+            value: rightItem?.text || answerPair.rightVariantId,
             isRight: isPairRight,
-            explanation: variant
-              ? isPairRight
-                ? variant.explainRight
-                : variant.explainWrong
-              : null,
+            explanation,
           };
         });
 
         // Check if all pairs are correct and all correct pairs are present
-        if (answerPairs.length === correctPairs.length) {
+        if (answerPairs.length === matchingConfig.correctPairs.length) {
           const allCorrect = pairsWithStatus.every((pair) => pair.isRight);
-          const allCorrectPresent = correctPairs.every((correctPair) => {
+          const allCorrectPresent = matchingConfig.correctPairs.every((correctPair) => {
             return answerPairs.some(
               (answerPair) =>
-                answerPair.key === correctPair.left &&
-                answerPair.value === correctPair.right,
+                answerPair.leftVariantId === correctPair.leftVariantId &&
+                answerPair.rightVariantId === correctPair.rightVariantId,
             );
           });
           isRight = allCorrect && allCorrectPresent;

@@ -10,6 +10,10 @@ import {
 } from "../../db/schema";
 import { status } from "elysia";
 import { SessionService } from "../session/service";
+import {
+  getMatchingQuestionForStudent,
+  type MatchingConfig,
+} from "../question/utils";
 
 export class QuizService {
   private sessionService: SessionService;
@@ -44,7 +48,7 @@ export class QuizService {
     };
   }
 
-  async getQuestionsByQuizId(id: string) {
+  async getQuestionsByQuizId(id: string, sessionId?: string, userId?: string) {
     const questionsQuery = await db.query.quizesQuestions.findMany({
       where: eq(quizesQuestions.quizId, id),
       with: {
@@ -60,14 +64,51 @@ export class QuizService {
       },
     });
 
-    return questionsQuery.map((qq) => ({
-      ...qq.question,
-      variants: qq.question.questionsVariants.map((qv) => ({
-        id: qv.variant.id,
-        text: qv.variant.text,
-      })),
-      questionsVariants: undefined,
-    }));
+    return questionsQuery.map((qq) => {
+      const question = qq.question;
+
+      // Handle matching questions
+      if (question.type === "matching") {
+        // Find matching config in questions_variants
+        const matchingConfigRecord = question.questionsVariants.find(
+          (qv) => qv.matchingConfig !== null,
+        );
+
+        if (matchingConfigRecord?.matchingConfig) {
+          const config = matchingConfigRecord.matchingConfig as MatchingConfig;
+          // Use sessionId as seed, or fallback to userId + quizId
+          const seed = sessionId || `${userId || ""}_${id}`;
+          const { leftItems, rightItems } = getMatchingQuestionForStudent(
+            config,
+            seed,
+          );
+
+          return {
+            ...question,
+            matchingLeftItems: leftItems,
+            matchingRightItems: rightItems,
+            variants: undefined,
+            questionsVariants: undefined,
+          };
+        }
+      }
+
+      // Handle regular questions (multichoice, truefalse, etc.)
+      // Filter out matching config records and get variants
+      const regularVariants = question.questionsVariants
+        .filter((qv) => qv.matchingConfig === null && qv.variantId !== null)
+        .map((qv) => ({
+          id: qv.variant?.id || "",
+          text: qv.variant?.text || "",
+        }))
+        .filter((v) => v.id && v.text);
+
+      return {
+        ...question,
+        variants: regularVariants,
+        questionsVariants: undefined,
+      };
+    });
   }
 
   async startQuizSessionAndGetQuestions(userId: string, quizId: string) {
@@ -115,14 +156,51 @@ export class QuizService {
         },
       });
 
-      const questions = questionsQuery.map((qq) => ({
-        ...qq.question,
-        variants: qq.question.questionsVariants.map((qv) => ({
-          id: qv.variant.id,
-          text: qv.variant.text,
-        })),
-        questionsVariants: undefined,
-      }));
+      const questions = questionsQuery.map((qq) => {
+        const question = qq.question;
+
+        // Handle matching questions
+        if (question.type === "matching") {
+          // Find matching config in questions_variants
+          const matchingConfigRecord = question.questionsVariants.find(
+            (qv) => qv.matchingConfig !== null,
+          );
+
+          if (matchingConfigRecord?.matchingConfig) {
+            const config = matchingConfigRecord.matchingConfig as MatchingConfig;
+            // Use sessionId as seed
+            const seed = session.id;
+            const { leftItems, rightItems } = getMatchingQuestionForStudent(
+              config,
+              seed,
+            );
+
+            return {
+              ...question,
+              matchingLeftItems: leftItems,
+              matchingRightItems: rightItems,
+              variants: undefined,
+              questionsVariants: undefined,
+            };
+          }
+        }
+
+        // Handle regular questions (multichoice, truefalse, etc.)
+        // Filter out matching config records and get variants
+        const regularVariants = question.questionsVariants
+          .filter((qv) => qv.matchingConfig === null && qv.variantId !== null)
+          .map((qv) => ({
+            id: qv.variant?.id || "",
+            text: qv.variant?.text || "",
+          }))
+          .filter((v) => v.id && v.text);
+
+        return {
+          ...question,
+          variants: regularVariants,
+          questionsVariants: undefined,
+        };
+      });
 
       return {
         session,

@@ -281,9 +281,9 @@ export const questionsVariants = thesisSchema.table("questions_variants", {
     .notNull()
     .references(() => questions.id),
   variantId: uuid()
-    .notNull()
     .references(() => variants.id),
-  isRight: boolean().notNull(),
+  isRight: boolean(),
+  matchingConfig: json(),
 });
 
 export const questionsVariantsRelations = relations(
