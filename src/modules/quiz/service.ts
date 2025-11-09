@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
   questions,
   questionsVariants,
   quizes,
   quizesQuestions,
+  quizSession,
   variants,
 } from "../../db/schema";
 import { status } from "elysia";
@@ -77,6 +78,20 @@ export class QuizService {
 
       if (!quiz) {
         throw status(404, "Quiz not found");
+      }
+
+      if (quiz.maxSessions > 0) {
+        const activeSessions = await tx.query.quizSession.findMany({
+          where: and(
+            eq(quizSession.userId, userId),
+            eq(quizSession.quizId, quizId),
+            isNull(quizSession.timeEnd),
+          ),
+        });
+
+        if (activeSessions.length >= quiz.maxSessions) {
+          throw status(403, "You have reached the maximum number of sessions");
+        }
       }
 
       const session = await this.sessionService.createSessionInTransaction(
