@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "../../db";
 import {
   questions,
@@ -126,7 +126,7 @@ export class QuizService {
           where: and(
             eq(quizSession.userId, userId),
             eq(quizSession.quizId, quizId),
-            isNull(quizSession.timeEnd),
+            isNotNull(quizSession.timeEnd),
           ),
         });
 
