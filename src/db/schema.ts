@@ -112,6 +112,7 @@ export const quizes = thesisSchema.table("quizes", {
     .$defaultFn(() => crypto.randomUUID()),
   type: varchar().notNull(),
   name: varchar().notNull(),
+  maxSessions: integer().notNull().default(1),
   description: text().notNull(),
   themeId: integer().references(() => themes.id),
 });

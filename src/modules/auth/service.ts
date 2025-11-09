@@ -36,7 +36,6 @@ export class AuthService {
       };
     } catch (error) {
       if (error instanceof DrizzleQueryError) {
-        console.log("asdf");
         if (error.cause instanceof postgres.PostgresError) {
           if (error.cause.constraint_name == "users_email_unique") {
             throw status(409, "User with this email already exists");
@@ -56,8 +55,6 @@ export class AuthService {
     if (userRecords.length === 0) {
       throw status(404, "Not Found");
     }
-
-    console.log(userRecords[0]);
 
     const user = userRecords[0];
     const isPasswordCorrect = await Bun.password.verify(

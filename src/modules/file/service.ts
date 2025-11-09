@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { files } from "../../db/schema";
 import { client } from "../../s3";
+import { PgTransaction } from "drizzle-orm/pg-core";
 
 export class FileService {
   constructor() {}
@@ -26,5 +27,20 @@ export class FileService {
         "Content-Disposition": `attachment; filename="${fileData.name}"`,
       },
     });
+  }
+
+  async uploadFile(file: File, path: string, userId: string, tx?: any) {
+    const fileData = await client.file(path).write(file);
+
+    if (tx) {
+      const [fileData] = await tx.insert(files).values({
+        name: file.name,
+        s3Index: path,
+        userId: userId,
+      }).returning();
+      return fileData;
+    }
+
+    return fileData;
   }
 }

@@ -1,10 +1,17 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
-import { themes } from "../../db/schema";
+import { files, referencesTheme, themes } from "../../db/schema";
 import { status } from "elysia";
+import { client } from "../../s3";
+import { FileService } from "../file/service";
 
 export class ThemeService {
-  constructor() {}
+
+  private fileService: FileService;
+
+  constructor() {
+    this.fileService = new FileService();
+  }
 
   async getThemeById(id: number) {
     const themeQuery = await db.query.themes.findFirst({
@@ -19,14 +26,31 @@ export class ThemeService {
   }
 
   async getThemeFiles(id: number) {
-    const themeQuery = await db.query.files.findMany({
-      where: eq(themes.id, id),
+    const themeFiles = await db
+      .select({
+        id: files.id,
+        name: files.name,
+        s3Index: files.s3Index,
+        userId: files.userId,
+      })
+      .from(files)
+      .innerJoin(referencesTheme, eq(files.id, referencesTheme.fileId))
+      .where(eq(referencesTheme.themeId, id));
+
+    return themeFiles;
+  }
+
+  async uploadFileToTheme(id: number, file: File, userId: string) {
+    const [fileData] = await db.transaction(async (tx) => {
+      const fileData = await this
+        .fileService.uploadFile(file, `themes/${id}/${file.name}`, userId, tx);
+      await tx.insert(referencesTheme).values({
+        themeId: id,
+        fileId: fileData.id,
+      });
+      return [fileData];
     });
-
-    if (!themeQuery) {
-      throw status(404, "Not Found");
-    }
-
-    return themeQuery;
+    
+    return fileData;
   }
 }

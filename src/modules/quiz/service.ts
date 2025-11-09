@@ -116,4 +116,22 @@ export class QuizService {
     });
   }
 
+  async getQuizesByThemeId(themeId: number) {
+    const quizesList = await db.query.quizes.findMany({
+      where: eq(quizes.themeId, themeId),
+      with: {
+        quizesQuestions: true,
+      },
+    });
+
+    return quizesList.map((quiz) => ({
+      id: quiz.id,
+      type: quiz.type,
+      name: quiz.name,
+      description: quiz.description,
+      themeId: quiz.themeId,
+      questionCount: quiz.quizesQuestions.length,
+    }));
+  }
+
 }

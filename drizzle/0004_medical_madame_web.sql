@@ -1,0 +1,1 @@
+ALTER TABLE "thesis"."quizes" ADD COLUMN "maxSessions" integer DEFAULT 1 NOT NULL;

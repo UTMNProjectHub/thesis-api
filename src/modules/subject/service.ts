@@ -7,38 +7,53 @@ import {
   subjects,
   themes,
 } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ilike, or } from "drizzle-orm";
 import { cache } from "../../db/redis";
+import { FileService } from "../file/service";
 
 export class SubjectService {
   private subjectCacheTTL = 600;
   private themesCacheTTL = 600;
   private filesCacheTTL = 300;
 
-  private getSubjectsCacheKey(): string {
-    return "subjects:all";
+  private fileService: FileService;
+
+  constructor() {
+    this.fileService = new FileService();
+  }
+
+  private getSubjectsCacheKey(q?: string): string {
+    return q ? `subjects:all:${q}` : "subjects:all";
   }
 
   private getSubjectCacheKey(id: number): string {
     return `subject:${id}`;
   }
 
-  private getSubjectThemesCacheKey(id: number): string {
-    return `subject:${id}:themes`;
+  private getSubjectThemesCacheKey(id: number, q?: string): string {
+    return q ? `subject:${id}:themes:${q}` : `subject:${id}:themes`;
   }
 
   private getSubjectFilesCacheKey(id: number): string {
     return `subject:${id}:files`;
   }
 
-  async getAllSubjects() {
-    const cacheKey = this.getSubjectsCacheKey();
+  async getAllSubjects(q?: string) {
+    const cacheKey = this.getSubjectsCacheKey(q);
 
     return await cache.getOrSet(
       cacheKey,
       async () => {
-        const subjects = await db.query.subjects.findMany();
-        return subjects;
+        const result = await db.query.subjects.findMany({
+          where: q
+            ? (table, { ilike: ilikeOp }) =>
+                or(
+                  ilikeOp(table.name, `%${q}%`),
+                  ilikeOp(table.shortName, `%${q}%`),
+                )
+            : undefined,
+        });
+        return result;
       },
       this.subjectCacheTTL,
     );
@@ -65,8 +80,8 @@ export class SubjectService {
     return subjectQuery;
   }
 
-  async getSubjectThemes(id: number) {
-    const cacheKey = this.getSubjectThemesCacheKey(id);
+  async getSubjectThemes(id: number, q?: string) {
+    const cacheKey = this.getSubjectThemesCacheKey(id, q);
 
     return await cache.getOrSet(
       cacheKey,
@@ -74,7 +89,11 @@ export class SubjectService {
         const themeQuery = await db
           .select()
           .from(themes)
-          .where(eq(themes.subjectId, id));
+          .where(
+            q
+              ? and(eq(themes.subjectId, id), ilike(themes.name, `%${q}%`))
+              : eq(themes.subjectId, id),
+          );
 
         if (!themeQuery) {
           throw status(404, "Not Found");
@@ -107,6 +126,18 @@ export class SubjectService {
       },
       this.filesCacheTTL,
     );
+  }
+
+  async uploadFileToSubject(id: number, file: File, userId: string) {
+    const [fileData] = await db.transaction(async (tx) => {
+      const fileData = await this.fileService.uploadFile(file, `subjects/${id}/${file.name}`, userId, tx);
+      await tx.insert(referencesSubject).values({
+        subjectId: id,
+        fileId: fileData.id,
+      });
+      return [fileData];
+    });
+    return fileData;
   }
 
   async invalidateSubjectCache(id: number) {

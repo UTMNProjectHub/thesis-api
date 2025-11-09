@@ -10,7 +10,7 @@ export const roleMacro = new Elysia()
     async resolve({ userId, userService }) {
       const roles = await userService.getUserRoles(userId);
 
-      if (!roles.find((role) => role.slug === "teacher")) {
+      if (!roles.some((role) => role.slug === "teacher")) {
         throw status(403, "Forbidden");
       }
 
