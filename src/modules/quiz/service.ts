@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
   questions,
@@ -7,6 +7,10 @@ import {
   quizesQuestions,
   quizSession,
   variants,
+  chosenVariants,
+  sessionSubmits,
+  usersQuizes,
+  referencesQuiz,
 } from "../../db/schema";
 import { status } from "elysia";
 import { SessionService } from "../session/service";
@@ -227,4 +231,37 @@ export class QuizService {
     }));
   }
 
+  async deleteQuiz(id: string) {
+    return await db.transaction(async (tx) => {
+      // 1. Удаляем session_submits, которые ссылаются на сессии этого квиза
+      const sessions = await tx.query.quizSession.findMany({
+        where: eq(quizSession.quizId, id),
+      });
+      
+      const sessionIds = sessions.map((s) => s.id);
+      if (sessionIds.length > 0) {
+        await tx
+          .delete(sessionSubmits)
+          .where(inArray(sessionSubmits.sessionId, sessionIds));
+      }
+
+      // 2. Удаляем chosen_variants, которые ссылаются на quiz
+      await tx.delete(chosenVariants).where(eq(chosenVariants.quizId, id));
+
+      // 3. Удаляем quiz_session, которые ссылаются на quiz
+      await tx.delete(quizSession).where(eq(quizSession.quizId, id));
+
+      // 4. Удаляем quizes_questions, которые ссылаются на quiz
+      await tx.delete(quizesQuestions).where(eq(quizesQuestions.quizId, id));
+
+      // 5. Удаляем users_quizes, которые ссылаются на quiz
+      await tx.delete(usersQuizes).where(eq(usersQuizes.quizId, id));
+
+      // 6. Удаляем references_quiz, которые ссылаются на quiz
+      await tx.delete(referencesQuiz).where(eq(referencesQuiz.quizId, id));
+
+      // 7. Наконец удаляем саму викторину
+      return await tx.delete(quizes).where(eq(quizes.id, id));
+    });
+  }
 }

@@ -43,6 +43,13 @@
       "when": 1762692692458,
       "tag": "0005_furry_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1762780400945,
+      "tag": "0006_ambiguous_jubilee",
+      "breakpoints": true
     }
   ]
 }

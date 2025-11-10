@@ -151,7 +151,7 @@ export const quizesQuestions = thesisSchema.table("quizes_questions", {
     .$defaultFn(() => crypto.randomUUID()),
   quizId: uuid()
     .notNull()
-    .references(() => quizes.id),
+    .references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
   questionId: uuid()
     .notNull()
     .references(() => questions.id),
@@ -178,7 +178,7 @@ export const usersQuizes = thesisSchema.table("users_quizes", {
     .references(() => users.id),
   quizId: uuid()
     .notNull()
-    .references(() => quizes.id),
+    .references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
 });
 
 export const usersQuizesRelations = relations(usersQuizes, ({ one }) => ({
@@ -194,7 +194,7 @@ export const usersQuizesRelations = relations(usersQuizes, ({ one }) => ({
 
 export const quizSession = thesisSchema.table("quiz_session", {
   id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
-  quizId: uuid().notNull().references(() => quizes.id),
+  quizId: uuid().notNull().references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
   userId: uuid().notNull().references(() => users.id),
   timeStart: timestamp(),
   timeEnd: timestamp(),
@@ -235,7 +235,7 @@ export const chosenVariants = thesisSchema.table("chosen_variants", {
     .$defaultFn(() => crypto.randomUUID()),
   quizId: uuid()
     .notNull()
-    .references(() => quizes.id),
+    .references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
   questionId: uuid()
     .notNull()
     .references(() => questions.id),
@@ -306,7 +306,7 @@ export const referencesQuiz = thesisSchema.table("references_quiz", {
     .$defaultFn(() => crypto.randomUUID()),
   quizId: uuid()
     .notNull()
-    .references(() => quizes.id),
+    .references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
   fileId: uuid()
     .notNull()
     .references(() => files.id),

@@ -24,6 +24,12 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       },
     },
   )
+  .delete("/:id", async ({ params: { id }, quizService }) => {
+    return await quizService.deleteQuiz(id);
+  }, {
+    isTeacher: true,
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
+  })
   .get(
     "/:id/questions",
     async ({ params: { id }, quizService, sessionService, userId, headers: { "x-active-session": activeSessionId } }) => {
