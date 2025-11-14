@@ -23,6 +23,8 @@
     "@elysiajs/stream": "^1.1.0",
     "@grpc/grpc-js": "^1.14.0",
     "@grpc/proto-loader": "^0.7.15",
+    "@types/amqplib": "^0.10.8",
+    "amqplib": "^0.10.9",
     "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.44.7",
     "drizzle-typebox": "^0.3.3",

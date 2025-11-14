@@ -384,7 +384,7 @@ export class QuestionService {
         .values({
           quizId,
           questionId,
-          answer: { text: answerText.trim() },
+          answer: { text: answerText.trim(), explanation: explanation },
           isRight,
         })
         .returning();

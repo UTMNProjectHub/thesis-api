@@ -174,13 +174,6 @@ export class SessionService {
         eq(quizSession.userId, userId),
         eq(quizSession.quizId, quizId),
       ),
-      with: {
-        sessionSubmits: {
-          with: {
-            submit: true
-          },
-        },
-      },
       orderBy: (quizSession, { desc }) => [desc(quizSession.timeStart)],
     });
 
