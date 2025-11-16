@@ -41,6 +41,27 @@ export const VariantModel = t.Object({
   questionsVariantsId: t.String({ format: "uuid" }),
 });
 
+export const MatchingLeftItemModel = t.Object({
+  id: t.String({ format: "uuid" }),
+  text: t.String(),
+});
+
+export const MatchingRightItemModel = t.Object({
+  id: t.String({ format: "uuid" }),
+  text: t.String(),
+});
+
+export const MatchingConfigModel = t.Object({
+  leftItems: t.Array(MatchingLeftItemModel),
+  rightItems: t.Array(MatchingRightItemModel),
+  correctPairs: t.Array(t.Object({
+    leftVariantId: t.String({ format: "uuid" }),
+    rightVariantId: t.String({ format: "uuid" }),
+    explainRight: t.Optional(t.String()),
+    explainWrong: t.Optional(t.String()),
+  })),
+});
+
 export const SubmittedVariantResponse = t.Object({
   variantId: t.String({ format: "uuid" }),
   variantText: t.String(),
@@ -117,5 +138,9 @@ export const UpdateQuestionVariant = t.Object({
 
 export const UpdateQuestionVariantsBody = t.Object({
   variants: t.Array(UpdateQuestionVariant),
+});
+
+export const UpdateQuestionMatchingConfigBody = t.Object({
+  matchingConfig: MatchingConfigModel,
 });
 

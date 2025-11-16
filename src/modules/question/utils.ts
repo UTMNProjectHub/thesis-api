@@ -47,17 +47,13 @@ export function shuffleWithSeed<T>(array: T[], seed: string | number): T[] {
  * Matching question configuration types
  */
 export interface MatchingLeftItem {
-  variantId: string;
+  id: string;
   text: string;
-  explainRight?: string;
-  explainWrong?: string;
 }
 
 export interface MatchingRightItem {
-  variantId: string;
+  id: string;
   text: string;
-  explainRight?: string;
-  explainWrong?: string;
 }
 
 export interface MatchingCorrectPair {

@@ -60,6 +60,32 @@ export class QuestionService {
     return variantsQuery;
   }
 
+  async getQuestionMatchingConfig(questionId: string) {
+    const matchingConfigRecord = await db.query.questionsVariants.findFirst({
+      where: eq(questionsVariants.questionId, questionId),
+    });
+
+    if (!matchingConfigRecord?.matchingConfig) {
+      return null;
+    }
+
+    // Преобразуем variantId из БД в id для API
+    const dbConfig = matchingConfigRecord.matchingConfig as any;
+    const apiConfig: MatchingConfig = {
+      leftItems: (dbConfig.leftItems || []).map((item: any) => ({
+        id: item.variantId || item.id, // Поддерживаем оба формата
+        text: item.text,
+      })),
+      rightItems: (dbConfig.rightItems || []).map((item: any) => ({
+        id: item.variantId || item.id, // Поддерживаем оба формата
+        text: item.text,
+      })),
+      correctPairs: dbConfig.correctPairs || [],
+    };
+
+    return apiConfig;
+  }
+
   async submitQuestionVariants(
     userId: string,
     quizId: string,
@@ -289,23 +315,23 @@ export class QuestionService {
 
           // Get left and right item texts for response
           const leftItem = matchingConfig.leftItems.find(
-            (li) => li.variantId === answerPair.leftVariantId,
+            (li) => li.id === answerPair.leftVariantId,
           );
           const rightItem = matchingConfig.rightItems.find(
-            (ri) => ri.variantId === answerPair.rightVariantId,
+            (ri) => ri.id === answerPair.rightVariantId,
           );
 
-          // Get explanation from correct pair or from items
+          // Get explanation from correct pair
           let explanation: string | null = null;
           if (isPairRight && correctPair) {
-            explanation = correctPair.explainRight || leftItem?.explainRight || rightItem?.explainRight || null;
+            explanation = correctPair.explainRight || null;
           } else {
             // Find the correct pair for this left item to show what was wrong
             const correctPairForLeft = matchingConfig.correctPairs.find(
               (cp) => cp.leftVariantId === answerPair.leftVariantId,
             );
             if (correctPairForLeft) {
-              explanation = correctPairForLeft.explainWrong || leftItem?.explainWrong || rightItem?.explainWrong || null;
+              explanation = correctPairForLeft.explainWrong || null;
             }
           }
 
@@ -461,6 +487,13 @@ export class QuestionService {
         throw status(404, "Question not found");
       }
 
+      // Для numerical вопросов должен быть только один правильный вариант
+      if (question.type === "numerical") {
+        if (variantsData.length !== 1 || !variantsData[0].isRight) {
+          throw status(400, "Numerical question must have exactly one correct variant");
+        }
+      }
+
       // Получаем все существующие questionsVariants для этого вопроса
       const existingQuestionsVariants = await tx.query.questionsVariants.findMany({
         where: eq(questionsVariants.questionId, questionId),
@@ -517,6 +550,156 @@ export class QuestionService {
           variantId: variant.id,
           isRight: variantData.isRight,
         });
+      }
+
+      return { success: true };
+    });
+  }
+
+  async updateQuestionMatchingConfig(
+    questionId: string,
+    matchingConfig: MatchingConfig
+  ) {
+    return await db.transaction(async (tx) => {
+      // Проверяем существование вопроса
+      const question = await tx.query.questions.findFirst({
+        where: eq(questions.id, questionId),
+      });
+
+      if (!question) {
+        throw status(404, "Question not found");
+      }
+
+      if (question.type !== "matching") {
+        throw status(400, "Question type must be matching");
+      }
+
+      // Получаем существующую запись questionsVariants с matchingConfig
+      const existingQuestionsVariants = await tx.query.questionsVariants.findMany({
+        where: eq(questionsVariants.questionId, questionId),
+      });
+
+      // Получаем все variant IDs из старой конфигурации
+      const oldVariantIds = new Set<string>();
+      for (const qv of existingQuestionsVariants) {
+        if (qv.matchingConfig) {
+          const oldConfig = qv.matchingConfig as any; // В БД хранится variantId, не id
+          oldConfig.leftItems?.forEach((item: any) => {
+            // Поддерживаем оба формата: variantId (старый) и id (новый)
+            const variantId = item.variantId || item.id;
+            if (variantId) oldVariantIds.add(variantId);
+          });
+          oldConfig.rightItems?.forEach((item: any) => {
+            const variantId = item.variantId || item.id;
+            if (variantId) oldVariantIds.add(variantId);
+          });
+        }
+        if (qv.variantId) {
+          oldVariantIds.add(qv.variantId);
+        }
+      }
+
+      // Удаляем старые questionsVariants
+      if (existingQuestionsVariants.length > 0) {
+        await tx
+          .delete(questionsVariants)
+          .where(eq(questionsVariants.questionId, questionId));
+      }
+
+      // Создаем новые variants для leftItems и rightItems
+      const leftVariants: Array<{ id: string; text: string }> = [];
+      const rightVariants: Array<{ id: string; text: string }> = [];
+
+      for (const leftItem of matchingConfig.leftItems) {
+        const [variant] = await tx
+          .insert(variants)
+          .values({
+            text: leftItem.text,
+            explainRight: "",
+            explainWrong: "",
+          })
+          .returning();
+        leftVariants.push({
+          id: variant.id,
+          text: variant.text,
+        });
+      }
+
+      for (const rightItem of matchingConfig.rightItems) {
+        const [variant] = await tx
+          .insert(variants)
+          .values({
+            text: rightItem.text,
+            explainRight: "",
+            explainWrong: "",
+          })
+          .returning();
+        rightVariants.push({
+          id: variant.id,
+          text: variant.text,
+        });
+      }
+
+      // Создаем обновленную matching конфигурацию с новыми variant IDs
+      // В БД хранится variantId, поэтому используем его
+      const updatedMatchingConfig: any = {
+        leftItems: leftVariants.map((v) => ({
+          variantId: v.id, // В БД используем variantId
+          text: v.text,
+        })),
+        rightItems: rightVariants.map((v) => ({
+          variantId: v.id, // В БД используем variantId
+          text: v.text,
+        })),
+        correctPairs: matchingConfig.correctPairs.map((pair) => {
+          // Находим новые variant IDs по id из оригинальных массивов
+          const leftIndex = matchingConfig.leftItems.findIndex(
+            (item) => item.id === pair.leftVariantId
+          );
+          const rightIndex = matchingConfig.rightItems.findIndex(
+            (item) => item.id === pair.rightVariantId
+          );
+          return {
+            leftVariantId: leftVariants[leftIndex]?.id || pair.leftVariantId,
+            rightVariantId: rightVariants[rightIndex]?.id || pair.rightVariantId,
+            explainRight: pair.explainRight,
+            explainWrong: pair.explainWrong,
+          };
+        }),
+      };
+
+      // Вставляем новую запись questionsVariants с обновленной конфигурацией
+      await tx.insert(questionsVariants).values({
+        questionId: questionId,
+        variantId: null,
+        isRight: null,
+        matchingConfig: updatedMatchingConfig,
+      });
+
+      // Удаляем старые variants, если они больше нигде не используются
+      if (oldVariantIds.size > 0) {
+        const variantIdsArray = Array.from(oldVariantIds).filter((id): id is string => id !== undefined && id !== null);
+        
+        if (variantIdsArray.length > 0) {
+          const allQuestionsVariants = await tx
+            .select()
+            .from(questionsVariants)
+            .where(inArray(questionsVariants.variantId, variantIdsArray));
+
+          const usedVariantIds = new Set(
+            allQuestionsVariants
+              .map((qv) => qv.variantId)
+              .filter((id): id is string => id !== null)
+          );
+
+          const unusedVariantIds = variantIdsArray.filter(
+            (id) => !usedVariantIds.has(id)
+          );
+
+          if (unusedVariantIds.length > 0) {
+            await tx.delete(variants).where(inArray(variants.id, unusedVariantIds));
+          }
+        }
       }
 
       return { success: true };
