@@ -215,7 +215,7 @@ export const quizSessionRelations = relations(quizSession, ({ one, many }) => ({
 export const sessionSubmits = thesisSchema.table("session_submits", {
   id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
   sessionId: uuid().notNull().references(() => quizSession.id),
-  submitId: uuid().notNull().references(() => chosenVariants.id),
+  submitId: uuid().notNull().references(() => chosenVariants.id, { onDelete: "cascade", onUpdate: "cascade" }),
 });
 
 export const sessionSubmitsRelations = relations(sessionSubmits, ({ one }) => ({
@@ -238,8 +238,8 @@ export const chosenVariants = thesisSchema.table("chosen_variants", {
     .references(() => quizes.id, { onDelete: "cascade", onUpdate: "cascade" }),
   questionId: uuid()
     .notNull()
-    .references(() => questions.id),
-  chosenId: uuid().references(() => questionsVariants.id),
+    .references(() => questions.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  chosenId: uuid().references(() => questionsVariants.id, { onDelete: "cascade", onUpdate: "cascade" }),
   answer: json(),
   isRight: boolean(),
 });

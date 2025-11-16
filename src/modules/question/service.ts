@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
   chosenVariants,
@@ -405,5 +405,121 @@ export class QuestionService {
       explanation,
       variants: variantsQuery,
     };
+  }
+
+  async updateQuestion(
+    id: string,
+    data: {
+      text?: string;
+      type?: string;
+      multiAnswer?: boolean | null;
+    }
+  ) {
+    const question = await db.query.questions.findFirst({
+      where: eq(questions.id, id),
+    });
+
+    if (!question) {
+      throw status(404, "Not Found");
+    }
+
+    const updateData: {
+      text?: string;
+      type?: string;
+      multiAnswer?: boolean | null;
+    } = {};
+
+    if (data.text !== undefined) updateData.text = data.text;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.multiAnswer !== undefined) updateData.multiAnswer = data.multiAnswer;
+
+    const [updated] = await db
+      .update(questions)
+      .set(updateData)
+      .where(eq(questions.id, id))
+      .returning();
+
+    return updated;
+  }
+
+  async updateQuestionVariants(
+    questionId: string,
+    variantsData: Array<{
+      text: string;
+      explainRight: string;
+      explainWrong: string;
+      isRight: boolean;
+    }>
+  ) {
+    return await db.transaction(async (tx) => {
+      // Проверяем существование вопроса
+      const question = await tx.query.questions.findFirst({
+        where: eq(questions.id, questionId),
+      });
+
+      if (!question) {
+        throw status(404, "Question not found");
+      }
+
+      // Получаем все существующие questionsVariants для этого вопроса
+      const existingQuestionsVariants = await tx.query.questionsVariants.findMany({
+        where: eq(questionsVariants.questionId, questionId),
+      });
+
+      // Получаем ID всех связанных variants
+      const variantIds = existingQuestionsVariants
+        .map((qv) => qv.variantId)
+        .filter((id): id is string => id !== null);
+
+      // Проверяем, используются ли эти variants в других вопросах (ПЕРЕД удалением)
+      let unusedVariantIds: string[] = [];
+      if (variantIds.length > 0) {
+        const allQuestionsVariants = await tx
+          .select()
+          .from(questionsVariants)
+          .where(inArray(questionsVariants.variantId, variantIds));
+
+        const usedVariantIds = new Set(
+          allQuestionsVariants
+            .map((qv) => qv.variantId)
+            .filter((id): id is string => id !== null)
+        );
+
+        // Удаляем только те variants, которые больше нигде не используются
+        unusedVariantIds = variantIds.filter((id) => !usedVariantIds.has(id));
+      }
+
+      // Удаляем старые questionsVariants
+      if (existingQuestionsVariants.length > 0) {
+        await tx
+          .delete(questionsVariants)
+          .where(eq(questionsVariants.questionId, questionId));
+      }
+
+      // Удаляем старые variants (если они больше нигде не используются)
+      if (unusedVariantIds.length > 0) {
+        await tx.delete(variants).where(inArray(variants.id, unusedVariantIds));
+      }
+
+      // Создаем новые variants и questionsVariants
+      for (const variantData of variantsData) {
+        const [variant] = await tx
+          .insert(variants)
+          .values({
+            text: variantData.text,
+            explainRight: variantData.explainRight,
+            explainWrong: variantData.explainWrong,
+          })
+          .returning();
+
+        await tx.insert(questionsVariants).values({
+          questionId: questionId,
+          variantId: variant.id,
+          isRight: variantData.isRight,
+        });
+      }
+
+      return { success: true };
+    });
   }
 }

@@ -101,3 +101,21 @@ export const SolveQuestionTextResponseUnion = t.Union([
 // Error Response
 export const ErrorResponse = t.String();
 
+// Update Models
+export const UpdateQuestionBody = t.Object({
+  text: t.Optional(t.String()),
+  type: t.Optional(QuestionType),
+  multiAnswer: t.Optional(t.Nullable(t.Boolean())),
+});
+
+export const UpdateQuestionVariant = t.Object({
+  text: t.String(),
+  explainRight: t.String(),
+  explainWrong: t.String(),
+  isRight: t.Boolean(),
+});
+
+export const UpdateQuestionVariantsBody = t.Object({
+  variants: t.Array(UpdateQuestionVariant),
+});
+

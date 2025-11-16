@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, inArray } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   questions,
@@ -11,6 +11,7 @@ import {
   sessionSubmits,
   usersQuizes,
   referencesQuiz,
+  users,
 } from "../../db/schema";
 import { status } from "elysia";
 import { SessionService } from "../session/service";
@@ -48,8 +49,49 @@ export class QuizService {
     return {
       ...quiz,
       quizesQuestions: undefined,
-      questionCount: quiz.quizesQuestions.length
+      questionCount: quiz.quizesQuestions.length,
     };
+  }
+
+  async updateQuiz(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      type?: string;
+      maxSessions?: number;
+      themeId?: number | null;
+    }
+  ) {
+    const quiz = await db.query.quizes.findFirst({
+      where: eq(quizes.id, id),
+    });
+
+    if (!quiz) {
+      throw status(404, "Not Found");
+    }
+
+    const updateData: {
+      name?: string;
+      description?: string;
+      type?: string;
+      maxSessions?: number;
+      themeId?: number | null;
+    } = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.maxSessions !== undefined) updateData.maxSessions = data.maxSessions;
+    if (data.themeId !== undefined) updateData.themeId = data.themeId;
+
+    const [updated] = await db
+      .update(quizes)
+      .set(updateData)
+      .where(eq(quizes.id, id))
+      .returning();
+
+    return updated;
   }
 
   async getQuestionsByQuizId(id: string, sessionId?: string, userId?: string) {
@@ -75,7 +117,7 @@ export class QuizService {
       if (question.type === "matching") {
         // Find matching config in questions_variants
         const matchingConfigRecord = question.questionsVariants.find(
-          (qv) => qv.matchingConfig !== null,
+          (qv) => qv.matchingConfig !== null
         );
 
         if (matchingConfigRecord?.matchingConfig) {
@@ -84,7 +126,7 @@ export class QuizService {
           const seed = sessionId || `${userId || ""}_${id}`;
           const { leftItems, rightItems } = getMatchingQuestionForStudent(
             config,
-            seed,
+            seed
           );
 
           return {
@@ -130,7 +172,7 @@ export class QuizService {
           where: and(
             eq(quizSession.userId, userId),
             eq(quizSession.quizId, quizId),
-            isNotNull(quizSession.timeEnd),
+            isNotNull(quizSession.timeEnd)
           ),
         });
 
@@ -142,7 +184,7 @@ export class QuizService {
       const session = await this.sessionService.createSessionInTransaction(
         tx,
         userId,
-        quizId,
+        quizId
       );
 
       const questionsQuery = await tx.query.quizesQuestions.findMany({
@@ -167,16 +209,17 @@ export class QuizService {
         if (question.type === "matching") {
           // Find matching config in questions_variants
           const matchingConfigRecord = question.questionsVariants.find(
-            (qv) => qv.matchingConfig !== null,
+            (qv) => qv.matchingConfig !== null
           );
 
           if (matchingConfigRecord?.matchingConfig) {
-            const config = matchingConfigRecord.matchingConfig as MatchingConfig;
+            const config =
+              matchingConfigRecord.matchingConfig as MatchingConfig;
             // Use sessionId as seed
             const seed = session.id;
             const { leftItems, rightItems } = getMatchingQuestionForStudent(
               config,
-              seed,
+              seed
             );
 
             return {
@@ -237,7 +280,7 @@ export class QuizService {
       const sessions = await tx.query.quizSession.findMany({
         where: eq(quizSession.quizId, id),
       });
-      
+
       const sessionIds = sessions.map((s) => s.id);
       if (sessionIds.length > 0) {
         await tx
@@ -263,5 +306,110 @@ export class QuizService {
       // 7. Наконец удаляем саму викторину
       return await tx.delete(quizes).where(eq(quizes.id, id));
     });
+  }
+
+  async getQuizUserSessions(quizId: string) {
+    // Сначала получаем количество вопросов в квизе
+    const questionCount = await db.query.quizesQuestions.findMany({
+      where: eq(quizesQuestions.quizId, quizId),
+    });
+    const totalQuestions = questionCount.length;
+
+    // Получаем все сессии с их submits и chosenVariants
+    const sessionsData = await db
+      .select({
+        userId: users.id,
+        fullName: users.full_name,
+        email: users.email,
+        sessionId: quizSession.id,
+        timeStart: quizSession.timeStart,
+        timeEnd: quizSession.timeEnd,
+        submitId: sessionSubmits.id,
+        isRight: chosenVariants.isRight,
+      })
+      .from(users)
+      .innerJoin(quizSession, eq(users.id, quizSession.userId))
+      .leftJoin(sessionSubmits, eq(sessionSubmits.sessionId, quizSession.id))
+      .leftJoin(chosenVariants, eq(sessionSubmits.submitId, chosenVariants.id))
+      .where(eq(quizSession.quizId, quizId));
+    
+    // Группируем данные по сессиям и вычисляем статистику
+    const sessionsMap = new Map<string, {
+      userId: string;
+      fullName: string | null;
+      email: string;
+      sessionId: string;
+      timeStart: Date | null;
+      timeEnd: Date | null;
+      totalSubmits: number;
+      rightAnswers: number;
+    }>();
+
+    for (const row of sessionsData) {
+      const key = row.sessionId;
+      if (!sessionsMap.has(key)) {
+        sessionsMap.set(key, {
+          userId: row.userId,
+          fullName: row.fullName,
+          email: row.email,
+          sessionId: row.sessionId,
+          timeStart: row.timeStart,
+          timeEnd: row.timeEnd,
+          totalSubmits: 0,
+          rightAnswers: 0,
+        });
+      }
+      const session = sessionsMap.get(key)!;
+      if (row.submitId) {
+        session.totalSubmits++;
+        if (row.isRight === true) {
+          session.rightAnswers++;
+        }
+      }
+    }
+
+    const sessions = Array.from(sessionsMap.values());
+    
+    const groupedByUser = sessions.reduce((acc, session) => {
+      const userId = session.userId;
+      if (!acc[userId]) {
+        acc[userId] = {
+          userId: session.userId,
+          fullName: session.fullName,
+          email: session.email,
+          sessions: [],
+        };
+      }
+      
+      // Вычисляем проценты
+      const percentSolved = totalQuestions > 0 
+        ? Math.round((session.totalSubmits / totalQuestions) * 100 * 100) / 100 
+        : 0;
+      const percentRight = session.totalSubmits > 0 
+        ? Math.round((session.rightAnswers / session.totalSubmits) * 100 * 100) / 100 
+        : 0;
+      
+      acc[userId].sessions.push({
+        id: session.sessionId,
+        timeStart: session.timeStart,
+        timeEnd: session.timeEnd,
+        percentSolved,
+        percentRight,
+      });
+      return acc;
+    }, {} as Record<string, { 
+      userId: string; 
+      fullName: string | null; 
+      email: string; 
+      sessions: Array<{ 
+        id: string; 
+        timeStart: Date | null; 
+        timeEnd: Date | null;
+        percentSolved: number;
+        percentRight: number;
+      }> 
+    }>);
+    
+    return Object.values(groupedByUser);
   }
 }

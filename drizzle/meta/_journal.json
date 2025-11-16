@@ -50,6 +50,20 @@
       "when": 1762780400945,
       "tag": "0006_ambiguous_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1763300777619,
+      "tag": "0007_silky_talos",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1763300946609,
+      "tag": "0008_quick_doctor_strange",
+      "breakpoints": true
     }
   ]
 }
