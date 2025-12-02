@@ -66,7 +66,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV == "production"
-        ? /^https?:\/\/([a-z0-9-]+\.)*quizy\.saveitsky\.ru(?::\d+)?$/i
+        ? 'https://front.quizy.saveitsky.ru'
         : true,
     credentials: true,
   }),
