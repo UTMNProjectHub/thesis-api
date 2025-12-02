@@ -451,3 +451,43 @@ export const referencesThemeRelations = relations(
     }),
   }),
 );
+
+export const summaries = thesisSchema.table("summaries", {
+  id: integer().generatedByDefaultAsIdentity().primaryKey(),
+  subjectId: integer().references(() => subjects.id),
+  themeId: integer().references(() => themes.id),
+  fileId: uuid().notNull().references(() => files.id),
+});
+
+export const referencesSummary = thesisSchema.table("references_summary", {
+  id: integer().generatedByDefaultAsIdentity().primaryKey(),
+  summaryId: integer().references(() => summaries.id),
+  fileId: uuid().notNull().references(() => files.id),
+});
+
+export const referencesSummaryRelations = relations(referencesSummary, ({ one }) => ({
+  summary: one(summaries, {
+    fields: [referencesSummary.summaryId],
+    references: [summaries.id],
+  }),
+  file: one(files, {
+    fields: [referencesSummary.fileId],
+    references: [files.id],
+  }),
+}));
+
+export const summariesRelations = relations(summaries, ({ one, many }) => ({
+  subject: one(subjects, {
+    fields: [summaries.subjectId],
+    references: [subjects.id],
+  }),
+  theme: one(themes, {
+    fields: [summaries.themeId],
+    references: [themes.id],
+  }),
+  file: one(files, {
+    fields: [summaries.fileId],
+    references: [files.id],
+  }),
+  referencesSummary: many(referencesSummary),
+}));

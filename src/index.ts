@@ -18,6 +18,10 @@ if (!process.env.REDIS_URL) {
   throw new Error("Please set REDIS_URL in dotenv");
 }
 
+if (!process.env.AMQP_URL) {
+  throw new Error("Please set AMQP_URL in dotenv");
+}
+
 import jwt from "@elysiajs/jwt";
 import openapi from "@elysiajs/openapi";
 import { Elysia, status } from "elysia";
@@ -31,6 +35,9 @@ import { theme } from "./modules/themes";
 import { file } from "./modules/file";
 import { quiz } from "./modules/quiz";
 import { question } from "./modules/question";
+import { generation } from "./modules/generation";
+import { websocket } from "./modules/websocket";
+import { initializeAMQP } from "./amqp";
 import { opentelemetry } from "@elysiajs/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
@@ -79,6 +86,8 @@ app.use(theme);
 app.use(file);
 app.use(quiz);
 app.use(question);
+app.use(generation);
+app.use(websocket);
 
 app.onError(({ error, code }) => {
   console.error(`[${code}]`, error);
@@ -94,19 +103,27 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-app.listen({
-  port: parseInt(process.env.ELYSIA_PORT as string),
-  hostname: "0.0.0.0",
-  reusePort: true,
-});
+// Initialize AMQP bridge before starting server
+initializeAMQP()
+  .then(() => {
+    app.listen({
+      port: parseInt(process.env.ELYSIA_PORT as string),
+      hostname: "0.0.0.0",
+      reusePort: true,
+    });
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
-);
-console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
-console.log(
-  `🔧 Precompilation: ${process.env.NODE_ENV === "production" ? "enabled" : "disabled"}`,
-);
+    console.log(
+      `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
+    );
+    console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(
+      `🔧 Precompilation: ${process.env.NODE_ENV === "production" ? "enabled" : "disabled"}`,
+    );
+  })
+  .catch((error) => {
+    console.error("Failed to initialize AMQP:", error);
+    process.exit(1);
+  });
 
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
