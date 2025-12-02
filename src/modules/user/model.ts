@@ -11,7 +11,7 @@ export const UserModel = new Elysia().model({
   minimalUserWithRoles: t.Intersect([
     t.Omit(_selectUser, t.Union([t.Literal("password")])),
     t.Object({
-      roles: t.Array(_selectRole),
+      roles: t.Optional(t.Array(_selectRole)),
     }),
   ]),
   editUserRequest: t.Object({
