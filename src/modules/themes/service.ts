@@ -8,6 +8,9 @@ import { SubjectService } from "../subject/service";
 import { cache } from "../../db/redis";
 
 export class ThemeService {
+  private themeCacheTTL = 600;
+  private filesCacheTTL = 300;
+
   private fileService: FileService;
   private subjectService: SubjectService;
 
@@ -20,7 +23,22 @@ export class ThemeService {
     return q ? `subject:${id}:themes:${q}` : `subject:${id}:themes`;
   }
 
+  private getThemeCacheKey(id: number): string {
+    return `theme:${id}`;
+  }
+
+  private getThemeFilesCacheKey(id: number): string {
+    return `theme:${id}:files`;
+  }
+
   async getThemeById(id: number) {
+    const cacheKey = this.getThemeCacheKey(id);
+
+    const cached = await cache.get<Awaited<ReturnType<typeof db.query.themes.findFirst>>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const themeQuery = await db.query.themes.findFirst({
       where: eq(themes.id, id),
     });
@@ -29,22 +47,32 @@ export class ThemeService {
       throw status(404, "Not Found");
     }
 
+    await cache.set(cacheKey, themeQuery, this.themeCacheTTL);
+
     return themeQuery;
   }
 
   async getThemeFiles(id: number) {
-    const themeFiles = await db
-      .select({
-        id: files.id,
-        name: files.name,
-        s3Index: files.s3Index,
-        userId: files.userId,
-      })
-      .from(files)
-      .innerJoin(referencesTheme, eq(files.id, referencesTheme.fileId))
-      .where(eq(referencesTheme.themeId, id));
+    const cacheKey = this.getThemeFilesCacheKey(id);
 
-    return themeFiles;
+    return await cache.getOrSet(
+      cacheKey,
+      async () => {
+        const themeFiles = await db
+          .select({
+            id: files.id,
+            name: files.name,
+            s3Index: files.s3Index,
+            userId: files.userId,
+          })
+          .from(files)
+          .innerJoin(referencesTheme, eq(files.id, referencesTheme.fileId))
+          .where(eq(referencesTheme.themeId, id));
+
+        return themeFiles;
+      },
+      this.filesCacheTTL,
+    );
   }
 
   async insertNewTheme(subjectId: number, name: string, description?: string) {
@@ -52,9 +80,7 @@ export class ThemeService {
       .insert(themes)
       .values({ subjectId, name, description });
 
-    if (inserted) {
-      cache.del(this.getSubjectThemesCacheKey(subjectId));
-    }
+    await cache.del(this.getSubjectThemesCacheKey(subjectId));
 
     return inserted;
   }
@@ -73,6 +99,8 @@ export class ThemeService {
       });
       return [fileData];
     });
+
+    await cache.del(this.getThemeFilesCacheKey(id));
 
     return fileData;
   }

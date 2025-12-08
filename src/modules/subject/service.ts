@@ -146,6 +146,9 @@ export class SubjectService {
       });
       return [fileData];
     });
+
+    cache.del(this.getSubjectFilesCacheKey(id));
+
     return fileData;
   }
 
