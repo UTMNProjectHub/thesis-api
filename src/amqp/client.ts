@@ -137,13 +137,28 @@ class AMQPClient {
           }
 
           try {
-            const content = JSON.parse(msg.content.toString());
+            let content;
+            try {
+              content = JSON.parse(msg.content.toString());
+            } catch (parseError) {
+              console.error(
+                `❌ Invalid JSON message from ${queueName}, ignoring:`,
+                parseError instanceof Error ? parseError.message : parseError,
+              );
+              // ack to remove shite out of the queue
+              this.channel?.ack(msg);
+              return;
+            }
+
             await handler(content);
             this.channel?.ack(msg);
           } catch (error) {
-            console.error(`Error processing message from ${queueName}:`, error);
-            // Reject and requeue the message
-            this.channel?.nack(msg, false, true);
+            console.error(
+              `❌ Error processing message from ${queueName}:`,
+              error instanceof Error ? error.message : error,
+            );
+            // Acknowledge to remove the message from queue (don't requeue bad messages)
+            this.channel?.ack(msg);
           }
         },
         {
