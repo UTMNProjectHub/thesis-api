@@ -1,7 +1,6 @@
 import { t } from "elysia";
 
 export const QuizGenBody = t.Object({
-  quizId: t.String({ format: "uuid" }),
   files: t.Array(t.String({ format: "uuid" })),
   difficulty: t.Union([
     t.Literal("easy"),

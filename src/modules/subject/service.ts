@@ -22,19 +22,19 @@ export class SubjectService {
     this.fileService = new FileService();
   }
 
-  private getSubjectsCacheKey(q?: string): string {
+  protected getSubjectsCacheKey(q?: string): string {
     return q ? `subjects:all:${q}` : "subjects:all";
   }
 
-  private getSubjectCacheKey(id: number): string {
+  protected getSubjectCacheKey(id: number): string {
     return `subject:${id}`;
   }
 
-  private getSubjectThemesCacheKey(id: number, q?: string): string {
+  protected getSubjectThemesCacheKey(id: number, q?: string): string {
     return q ? `subject:${id}:themes:${q}` : `subject:${id}:themes`;
   }
 
-  private getSubjectFilesCacheKey(id: number): string {
+  protected getSubjectFilesCacheKey(id: number): string {
     return `subject:${id}:files`;
   }
 
@@ -62,7 +62,7 @@ export class SubjectService {
   async getSubjectById(id: number) {
     const cacheKey = this.getSubjectCacheKey(id);
 
-    const cached = await cache.get(cacheKey);
+    const cached = await cache.get<Awaited<ReturnType<typeof db.query.subjects.findFirst>>>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -78,6 +78,15 @@ export class SubjectService {
     await cache.set(cacheKey, subjectQuery, this.subjectCacheTTL);
 
     return subjectQuery;
+  }
+
+  async createNewSubject(name: string, shortName: string, yearStart: number, yearEnd: number,  description?: string)
+  {
+    const inserted = await db.insert(subjects).values({name, shortName, description, yearStart, yearEnd});
+    
+    await this.invalidateAllSubjectsCache();
+
+    return inserted;
   }
 
   async getSubjectThemes(id: number, q?: string) {

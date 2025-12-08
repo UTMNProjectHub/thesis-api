@@ -16,12 +16,17 @@ export const generation = new Elysia({ prefix: "/generation" })
   .post(
     "/quiz",
     async ({ body, set }) => {
+      const quizId = Bun.randomUUIDv7();
+
       try {
-        await amqpClient.publishToQueue(QUEUES.QUIZ_GENERATION_REQUEST, body);
+        await amqpClient.publishToQueue(QUEUES.QUIZ_GENERATION_REQUEST, {
+          ...body,
+          quizId: quizId,
+        });
         return {
           success: true,
           message: "Quiz generation request sent",
-          quizId: body.quizId,
+          quizId: quizId,
         };
       } catch (error) {
         console.error("Error publishing quiz generation request:", error);

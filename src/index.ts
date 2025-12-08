@@ -22,6 +22,10 @@ if (!process.env.AMQP_URL) {
   throw new Error("Please set AMQP_URL in dotenv");
 }
 
+if (!process.env.WS_PORT) {
+  throw new Error("Please set WS_PORT in dotenv");
+}
+
 import jwt from "@elysiajs/jwt";
 import openapi from "@elysiajs/openapi";
 import { Elysia, status } from "elysia";
@@ -36,13 +40,14 @@ import { file } from "./modules/file";
 import { quiz } from "./modules/quiz";
 import { question } from "./modules/question";
 import { generation } from "./modules/generation";
-import { websocket } from "./modules/websocket";
 import { initializeAMQP } from "./amqp";
+import { websocket } from "./modules/websocket";
 import { opentelemetry } from "@elysiajs/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import staticPlugin from "@elysiajs/static";
 
+// HTTP API app
 const app = new Elysia({
   prefix: "/api",
   precompile: true,
@@ -52,14 +57,13 @@ const app = new Elysia({
   },
 });
 
+// WebSocket app (separate server)
+const wsApp = new Elysia();
+
 app.use(staticPlugin());
 
 app.use(
-  openapi({
-    scalar: {
-      favicon: "/public/favicon.ico",
-    },
-  }),
+  openapi(),
 );
 
 app.use(
@@ -87,7 +91,9 @@ app.use(file);
 app.use(quiz);
 app.use(question);
 app.use(generation);
-app.use(websocket);
+
+// WebSocket server setup
+wsApp.use(websocket);
 
 app.onError(({ error, code }) => {
   console.error(`[${code}]`, error);
@@ -103,17 +109,28 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// Initialize AMQP bridge before starting server
+// Initialize AMQP bridge before starting servers
 initializeAMQP()
   .then(() => {
+    // Start HTTP API server
     app.listen({
       port: parseInt(process.env.ELYSIA_PORT as string),
       hostname: "0.0.0.0",
       reusePort: true,
     });
 
+    // Start WebSocket server on separate port
+    wsApp.listen({
+      port: parseInt(process.env.WS_PORT as string),
+      hostname: "0.0.0.0",
+      reusePort: true,
+    });
+
     console.log(
-      `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
+      `🦊 HTTP API running at ${app.server?.hostname}:${app.server?.port}`,
+    );
+    console.log(
+      `🔌 WebSocket running at ${wsApp.server?.hostname}:${wsApp.server?.port}`,
     );
     console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(
@@ -127,12 +144,12 @@ initializeAMQP()
 
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
-  await app.stop();
+  await Promise.all([app.stop(), wsApp.stop()]);
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully...");
-  await app.stop();
+  await Promise.all([app.stop(), wsApp.stop()]);
   process.exit(0);
 });

@@ -4,13 +4,20 @@ import { files, referencesTheme, themes } from "../../db/schema";
 import { status } from "elysia";
 import { client } from "../../s3";
 import { FileService } from "../file/service";
+import { SubjectService } from "../subject/service";
+import { cache } from "../../db/redis";
 
 export class ThemeService {
-
   private fileService: FileService;
+  private subjectService: SubjectService;
 
   constructor() {
     this.fileService = new FileService();
+    this.subjectService = new SubjectService();
+  }
+
+  private getSubjectThemesCacheKey(id: number, q?: string): string {
+    return q ? `subject:${id}:themes:${q}` : `subject:${id}:themes`;
   }
 
   async getThemeById(id: number) {
@@ -40,17 +47,33 @@ export class ThemeService {
     return themeFiles;
   }
 
+  async insertNewTheme(subjectId: number, name: string, description?: string) {
+    const inserted = await db
+      .insert(themes)
+      .values({ subjectId, name, description });
+
+    if (inserted) {
+      cache.del(this.getSubjectThemesCacheKey(subjectId));
+    }
+
+    return inserted;
+  }
+
   async uploadFileToTheme(id: number, file: File, userId: string) {
     const [fileData] = await db.transaction(async (tx) => {
-      const fileData = await this
-        .fileService.uploadFile(file, `themes/${id}/${file.name}`, userId, tx);
+      const fileData = await this.fileService.uploadFile(
+        file,
+        `themes/${id}/${file.name}`,
+        userId,
+        tx
+      );
       await tx.insert(referencesTheme).values({
         themeId: id,
         fileId: fileData.id,
       });
       return [fileData];
     });
-    
+
     return fileData;
   }
 }

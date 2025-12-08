@@ -9,6 +9,7 @@ export class WebSocketManager {
   private subscriptions: Map<string, Set<WebSocket>> = new Map();
 
   subscribe(ws: WebSocket, topic: string): void {
+    console.log(`📡 WebSocket requested to subscribe to topic: ${topic}`);
     if (!this.subscriptions.has(topic)) {
       this.subscriptions.set(topic, new Set());
     }
