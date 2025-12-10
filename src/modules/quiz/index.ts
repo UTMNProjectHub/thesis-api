@@ -57,6 +57,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     "/:id/questions",
     async ({
       params: { id },
+      query: { view },
       quizService,
       sessionService,
       userId,
@@ -77,7 +78,11 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         );
       }
 
-      if (Array.isArray(roles) && roles.some((role: any) => role.slug === "teacher")) {
+      if (
+        Array.isArray(roles) &&
+        roles.some((role: any) => role.slug === "teacher")
+        && view === true
+      ) {
         return await quizService.getQuestionsByQuizId(id, undefined, userId);
       }
 
@@ -89,6 +94,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     },
     {
       params: t.Object({ id: t.String({ format: "uuid" }) }),
+      query: t.Object({ view: t.Optional(t.Boolean()) }),
       isAuth: true,
       headers: t.Object({
         "x-active-session": t.Optional(t.String({ format: "uuid" })),
@@ -154,9 +160,13 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       isAuth: true,
     }
   )
-  .get("/:id/sessions/users", async ({ params: { id }, quizService }) => {
-    return await quizService.getQuizUserSessions(id);
-  }, {
-    params: t.Object({ id: t.String({ format: "uuid" }) }),
-    isTeacher: true
-  });
+  .get(
+    "/:id/sessions/users",
+    async ({ params: { id }, quizService }) => {
+      return await quizService.getQuizUserSessions(id);
+    },
+    {
+      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      isTeacher: true,
+    }
+  );
