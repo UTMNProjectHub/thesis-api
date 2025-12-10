@@ -91,9 +91,8 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         userId,
         id
       );
-      // Возвращаем sessionId в заголовке для автоматической установки на фронтенде
-      set.headers['X-Session-Id'] = session.id;
-      return questions;
+
+      return {questions, sessionId: session.id};
     },
     {
       params: t.Object({ id: t.String({ format: "uuid" }) }),
