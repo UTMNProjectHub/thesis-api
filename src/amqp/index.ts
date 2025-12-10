@@ -14,7 +14,7 @@ export async function initializeAMQP() {
         const topic = `quiz.${quizId}.generation`;
 
         console.log(
-          `📨 Received quiz generation complete for quizId: ${quizId}, status: ${status}`,
+          `📨 Received quiz generation complete for quizId: ${quizId}, status: ${status}, error: ${error}`,
         );
 
         wsManager.broadcast(topic, {
@@ -33,7 +33,7 @@ export async function initializeAMQP() {
         const topic = `summary.${summaryId}.generation`;
 
         console.log(
-          `📨 Received summary generation complete for summaryId: ${summaryId}, status: ${status}`,
+          `📨 Received summary generation complete for summaryId: ${summaryId}, status: ${status}, error: ${error}`,
         );
 
         wsManager.broadcast(topic, {
