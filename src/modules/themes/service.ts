@@ -58,18 +58,18 @@ export class ThemeService {
     return await cache.getOrSet(
       cacheKey,
       async () => {
-        const themeFiles = await db
-          .select({
-            id: files.id,
-            name: files.name,
-            s3Index: files.s3Index,
-            userId: files.userId,
-          })
-          .from(files)
-          .innerJoin(referencesTheme, eq(files.id, referencesTheme.fileId))
-          .where(eq(referencesTheme.themeId, id));
+    const themeFiles = await db
+      .select({
+        id: files.id,
+        name: files.name,
+        s3Index: files.s3Index,
+        userId: files.userId,
+      })
+      .from(files)
+      .innerJoin(referencesTheme, eq(files.id, referencesTheme.fileId))
+      .where(eq(referencesTheme.themeId, id));
 
-        return themeFiles;
+    return themeFiles;
       },
       this.filesCacheTTL,
     );

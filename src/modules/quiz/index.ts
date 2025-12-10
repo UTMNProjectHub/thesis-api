@@ -63,6 +63,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       userId,
       headers: { "x-active-session": activeSessionId },
       userService,
+      set
     }) => {
       const roles = await userService.getUserRoles(userId);
 
@@ -86,10 +87,12 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         return await quizService.getQuestionsByQuizId(id, undefined, userId);
       }
 
-      const { questions } = await quizService.startQuizSessionAndGetQuestions(
+      const { session, questions } = await quizService.startQuizSessionAndGetQuestions(
         userId,
         id
       );
+      // Возвращаем sessionId в заголовке для автоматической установки на фронтенде
+      set.headers['X-Session-Id'] = session.id;
       return questions;
     },
     {
