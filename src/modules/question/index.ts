@@ -39,11 +39,10 @@ export const question = new Elysia({ prefix: "/questions" })
           questionsVariantsId: v.questionsVariantsId,
         }));
 
-      // Для matching вопросов загружаем matchingConfig
+
       if (question.type === "matching") {
         const matchingConfig = await questionService.getQuestionMatchingConfig(id);
         if (matchingConfig) {
-          // Преобразуем variantId в id для API
           const apiMatchingConfig = {
             leftItems: matchingConfig.leftItems.map((item) => ({
               id: item.id,
@@ -133,10 +132,6 @@ export const question = new Elysia({ prefix: "/questions" })
       isAuth: true,
       params: SolveQuestionParams,
       response: {
-        200: t.Union([
-          SolveQuestionVariantsResponse,
-          SolveQuestionTextResponseUnion,
-        ]),
         400: ErrorResponse,
       },
       body: SolveQuestionBody,
