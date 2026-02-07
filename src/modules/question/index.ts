@@ -132,6 +132,10 @@ export const question = new Elysia({ prefix: "/questions" })
       isAuth: true,
       params: SolveQuestionParams,
       response: {
+        200: t.Union([
+          SolveQuestionVariantsResponse,
+          SolveQuestionTextResponseUnion,
+        ]),
         400: ErrorResponse,
       },
       body: SolveQuestionBody,

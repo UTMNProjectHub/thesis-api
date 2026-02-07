@@ -46,6 +46,7 @@ import { opentelemetry } from "@elysiajs/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import staticPlugin from "@elysiajs/static";
+import { quizSession } from "./modules/session";
 
 // HTTP API app
 const app = new Elysia({
@@ -70,7 +71,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV == "production"
-        ? 'https://front.quizy.saveitsky.ru'
+        ? RegExp('^https:\/\/.*\.saveitsky\.ru$')
         : true,
     credentials: true,
   }),
@@ -90,7 +91,8 @@ app.use(theme);
 app.use(file);
 app.use(quiz);
 app.use(question);
-app.use(generation);
+app.use(generation)
+app.use(quizSession);
 
 // WebSocket server setup
 wsApp.use(websocket);

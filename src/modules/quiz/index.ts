@@ -26,7 +26,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       response: {
         200: "plainQuiz",
       },
-    }
+    },
   )
   .delete(
     "/:id",
@@ -36,7 +36,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     {
       isTeacher: true,
       params: t.Object({ id: t.String({ format: "uuid" }) }),
-    }
+    },
   )
   .put(
     "/:id",
@@ -51,7 +51,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         200: "plainQuiz",
         404: t.String(),
       },
-    }
+    },
   )
   .get(
     "/:id/questions",
@@ -63,7 +63,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       userId,
       headers: { "x-active-session": activeSessionId },
       userService,
-      set
+      set,
     }) => {
       const roles = await userService.getUserRoles(userId);
 
@@ -75,24 +75,22 @@ export const quiz = new Elysia({ prefix: "/quizes" })
         return await quizService.getQuestionsByQuizId(
           id,
           activeSessionId,
-          userId
+          userId,
         );
       }
 
       if (
         Array.isArray(roles) &&
-        roles.some((role: any) => role.slug === "teacher")
-        && view === true
+        roles.some((role: any) => role.slug === "teacher") &&
+        view === true
       ) {
         return await quizService.getQuestionsByQuizId(id, undefined, userId);
       }
 
-      const { session, questions } = await quizService.startQuizSessionAndGetQuestions(
-        userId,
-        id
-      );
+      const { session, questions } =
+        await quizService.startQuizSessionAndGetQuestions(userId, id);
 
-      return {questions, sessionId: session.id};
+      return { questions, sessionId: session.id };
     },
     {
       params: t.Object({ id: t.String({ format: "uuid" }) }),
@@ -101,74 +99,5 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       headers: t.Object({
         "x-active-session": t.Optional(t.String({ format: "uuid" })),
       }),
-    }
-  )
-  .get(
-    "/:id/sessions/active",
-    async ({ params: { id }, sessionService, userId }) => {
-      return await sessionService.getActiveSessions(userId, id);
     },
-    {
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
-      isAuth: true,
-    }
-  )
-  .get(
-    "/:id/sessions/:sessionId/submits",
-    async ({
-      params: { id, sessionId },
-      sessionService,
-      userService,
-      userId,
-    }) => {
-      const session = await sessionService.getSession(sessionId);
-      const userRoles = await userService.getUserRoles(userId);
-      const isTeacher =
-        Array.isArray(userRoles) &&
-        userRoles.some((role: any) => role.slug === "teacher");
-      if (session.userId !== userId && !isTeacher) {
-        throw status(403, "Forbidden");
-      }
-      return await sessionService.getSessionSubmits(sessionId);
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-        sessionId: t.String({ format: "uuid" }),
-      }),
-      isAuth: true,
-    }
-  )
-  .post(
-    "/:id/sessions/:sessionId/finish",
-    async ({ params: { id, sessionId }, sessionService, userId }) => {
-      return await sessionService.endSession(sessionId, userId);
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-        sessionId: t.String({ format: "uuid" }),
-      }),
-      isAuth: true,
-    }
-  )
-  .get(
-    "/:id/sessions/all",
-    async ({ params: { id }, sessionService, userId }) => {
-      return await sessionService.getUserSessions(userId, id);
-    },
-    {
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
-      isAuth: true,
-    }
-  )
-  .get(
-    "/:id/sessions/users",
-    async ({ params: { id }, quizService }) => {
-      return await quizService.getQuizUserSessions(id);
-    },
-    {
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
-      isTeacher: true,
-    }
   );
