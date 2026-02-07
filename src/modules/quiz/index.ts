@@ -16,36 +16,36 @@ export const quiz = new Elysia({ prefix: "/quizes" })
   .use(authMacro)
   .use(roleMacro)
   .get(
-    "/:id",
-    async ({ quizService, params: { id } }) => {
-      return await quizService.getQuizById(id);
+    "/:quizId",
+    async ({ quizService, params: { quizId } }) => {
+      return await quizService.getQuizById(quizId);
     },
     {
       isAuth: true,
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       response: {
         200: "plainQuiz",
       },
     },
   )
   .delete(
-    "/:id",
-    async ({ params: { id }, quizService }) => {
-      return await quizService.deleteQuiz(id);
+    "/:quizId",
+    async ({ params: { quizId }, quizService }) => {
+      return await quizService.deleteQuiz(quizId);
     },
     {
       isTeacher: true,
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
     },
   )
   .put(
-    "/:id",
-    async ({ params: { id }, quizService, body }) => {
-      return await quizService.updateQuiz(id, body);
+    "/:quizId",
+    async ({ params: { quizId }, quizService, body }) => {
+      return await quizService.updateQuiz(quizId, body);
     },
     {
       isTeacher: true,
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       body: "updateQuizBody",
       response: {
         200: "plainQuiz",
@@ -54,9 +54,9 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     },
   )
   .get(
-    "/:id/questions",
+    "/:quizId/questions",
     async ({
-      params: { id },
+      params: { quizId },
       query: { view },
       quizService,
       sessionService,
@@ -67,33 +67,34 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     }) => {
       const roles = await userService.getUserRoles(userId);
 
+      if (
+        Array.isArray(roles) &&
+        roles.some((role: any) => role.slug === "teacher") &&
+        view === true
+      ) {
+        return await quizService.getQuestionsByQuizId(
+          quizId,
+          undefined,
+          userId,
+        );
+      }
+
       if (activeSessionId) {
         const session = await sessionService.getSession(activeSessionId);
         if (session.userId !== userId) {
           throw status(403, "Forbidden");
         }
         return await quizService.getQuestionsByQuizId(
-          id,
+          quizId,
           activeSessionId,
           userId,
         );
       }
 
-      if (
-        Array.isArray(roles) &&
-        roles.some((role: any) => role.slug === "teacher") &&
-        view === true
-      ) {
-        return await quizService.getQuestionsByQuizId(id, undefined, userId);
-      }
-
-      const { session, questions } =
-        await quizService.startQuizSessionAndGetQuestions(userId, id);
-
-      return { questions, sessionId: session.id };
+      return status(403, "Forbidden");
     },
     {
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       query: t.Object({ view: t.Optional(t.Boolean()) }),
       isAuth: true,
       headers: t.Object({

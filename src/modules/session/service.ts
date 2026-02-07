@@ -1,6 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "../../db";
-import { quizSession, sessionSubmits } from "../../db/schema";
+import { quizes, quizSession, sessionSubmits } from "../../db/schema";
 import { status } from "elysia";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -115,29 +115,43 @@ export class SessionService {
     return session;
   }
 
-  async createSessionInTransaction(tx: Transaction, userId: string, quizId: string) {
-    const activeSessions = await tx.query.quizSession.findMany({
-      where: and(
-        eq(quizSession.userId, userId),
-        eq(quizSession.quizId, quizId),
-        isNull(quizSession.timeEnd),
-      ),
+  async createSessionIfUnderLimit(userId: string, quizId: string) {
+    return await db.transaction(async (tx) => {
+      const [quiz] = await tx
+        .select()
+        .from(quizes)
+        .where(eq(quizes.id, quizId))
+        .for("update");
+
+      if (!quiz) {
+        throw status(400, "Bad Request");
+      }
+
+      const [{ sessionCount }] = await tx
+        .select({ sessionCount: count() })
+        .from(quizSession)
+        .where(
+          and(
+            eq(quizSession.userId, userId),
+            eq(quizSession.quizId, quizId),
+          ),
+        );
+
+      if (sessionCount >= quiz.maxSessions) {
+        throw status(409, "Достигнуто максимальное кол-во активных сессий.");
+      }
+
+      const [session] = await tx
+        .insert(quizSession)
+        .values({
+          userId,
+          quizId,
+          timeStart: new Date(),
+        })
+        .returning();
+
+      return session;
     });
-
-    if (activeSessions.length > 0) {
-      throw status(409, "You have an active session for this quiz");
-    }
-
-    const [session] = await tx
-      .insert(quizSession)
-      .values({
-        userId,
-        quizId,
-        timeStart: new Date(),
-      })
-      .returning();
-
-    return session;
   }
 
   async endSession(sessionId: string, userId: string) {

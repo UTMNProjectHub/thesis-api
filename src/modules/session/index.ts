@@ -10,7 +10,7 @@ export const quizSession = new Elysia()
   .decorate("sessionService", new SessionService())
   .decorate("quizService", new QuizService())
   .get(
-    "/quiz/:quizId/sessions/active",
+    "/quizes/:quizId/sessions/active",
     async ({ params: { quizId }, sessionService, userId }) => {
       return await sessionService.getActiveSessions(userId, quizId);
     },
@@ -22,7 +22,7 @@ export const quizSession = new Elysia()
     },
   )
   .get(
-    "/quiz/:quizId/sessions",
+    "/quizes/:quizId/sessions",
     async ({ userId, sessionService, params: { quizId } }) => {
       return await sessionService.getUserSessions(userId, quizId);
     },
@@ -36,24 +36,9 @@ export const quizSession = new Elysia()
     },
   )
   .post(
-    "/quiz/:quizId/sessions",
-    async ({ params: { quizId }, sessionService, quizService, userId }) => {
-      const quiz = await quizService.getQuizById(quizId);
-
-      if (!quiz) {
-        return status(400, "Bad Request");
-      }
-
-      const activeSessions = await sessionService.getActiveSessions(
-        userId,
-        quizId,
-      );
-
-      if (activeSessions.length >= quiz.maxSessions) {
-        return status(409, "Достигнуто максимальное кол-во активных сессий.");
-      }
-
-      return await sessionService.createSession(userId, quizId);
+    "/quizes/:quizId/sessions",
+    async ({ params: { quizId }, sessionService, userId }) => {
+      return await sessionService.createSessionIfUnderLimit(userId, quizId);
     },
     {
       isAuth: true,
@@ -63,32 +48,32 @@ export const quizSession = new Elysia()
     },
   )
   .get(
-    "/quiz/:quizId/sessions/users",
-    async ({ params: { id }, quizService }) => {
-      return await quizService.getQuizUserSessions(id);
+    "/quizes/:quizId/sessions/users",
+    async ({ params: { quizId }, quizService }) => {
+      return await quizService.getQuizUserSessions(quizId);
     },
     {
-      params: t.Object({ id: t.String({ format: "uuid" }) }),
+      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       isTeacher: true,
     },
   )
   .post(
-    "/quiz/:quizId/sessions/:sessionId/finish",
-    async ({ params: { id, sessionId }, sessionService, userId }) => {
+    "/quizes/:quizId/sessions/:sessionId/finish",
+    async ({ params: { quizId, sessionId }, sessionService, userId }) => {
       return await sessionService.endSession(sessionId, userId);
     },
     {
       params: t.Object({
-        id: t.String({ format: "uuid" }),
+        quizId: t.String({ format: "uuid" }),
         sessionId: t.String({ format: "uuid" }),
       }),
       isAuth: true,
     },
   )
   .get(
-    "/:id/sessions/:sessionId/submits",
+    "/quizes/:quizId/sessions/:sessionId/submits",
     async ({
-      params: { id, sessionId },
+      params: { quizId, sessionId },
       sessionService,
       userService,
       userId,
@@ -105,7 +90,7 @@ export const quizSession = new Elysia()
     },
     {
       params: t.Object({
-        id: t.String({ format: "uuid" }),
+        quizId: t.String({ format: "uuid" }),
         sessionId: t.String({ format: "uuid" }),
       }),
       isAuth: true,
