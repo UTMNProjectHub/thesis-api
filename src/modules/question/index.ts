@@ -1,6 +1,7 @@
 import Elysia, { status, t } from "elysia";
 import { authMacro } from "../auth/handlers";
 import { roleMacro } from "../roles/macro";
+import { SessionService } from "../session/service";
 import { UserService } from "../user/service";
 import {
 	ErrorResponse,
@@ -16,6 +17,7 @@ import {
 	VariantModel,
 } from "./model";
 import { QuestionService } from "./service";
+import { shuffleWithSeed } from "./utils";
 
 export const question = new Elysia({
 	prefix: "/questions",
@@ -23,6 +25,7 @@ export const question = new Elysia({
 	.use(authMacro)
 	.use(roleMacro)
 	.decorate("questionService", new QuestionService())
+	.decorate("sessionService", new SessionService())
 	.decorate("userService", new UserService())
 	.get(
 		"/:id",
@@ -54,21 +57,74 @@ export const question = new Elysia({
 	)
 	.get(
 		"/:id/variants",
-		async ({ params: { id }, userId, userService, questionService }) => {
+		async ({
+			params: { id },
+			userId,
+			userService,
+			questionService,
+			sessionService,
+			headers: { "x-active-session": activeSessionId },
+		}) => {
 			const roles = await userService.getUserRoles(userId);
-
-			if (
+			const isTeacher =
 				Array.isArray(roles) &&
-				roles.some((role: { slug: string }) => role.slug === "teacher")
-			) {
+				roles.some((role: { slug: string }) => role.slug === "teacher");
+
+			if (isTeacher && !activeSessionId) {
 				return await questionService.getQuestionVariants(id);
 			}
 
-			throw status(403, "Forbidden");
+			if (!activeSessionId) {
+				throw status(
+					400,
+					"Active session header required for accessing question variants",
+				);
+			}
+
+			const question = await questionService.getQuestion(id);
+			const allVariants = await questionService.getQuestionVariants(id);
+
+			if (question.type === "matching") {
+				const session = await sessionService.getSession(activeSessionId);
+				if (session.userId !== userId) {
+					throw status(403, "Forbidden");
+				}
+
+				const leftItems = allVariants
+					.filter((v) => v.leftMatching !== null)
+					.map((v) => ({
+						id: v.id,
+						text: v.leftMatching as string,
+					}));
+
+				const rightItems = allVariants
+					.filter((v) => v.rightMatching !== null)
+					.map((v) => ({
+						id: v.id,
+						text: v.rightMatching as string,
+					}));
+
+				return {
+					leftItems,
+					rightItems: shuffleWithSeed(rightItems, session.id),
+				};
+			}
+
+			return allVariants.map((v) => ({
+				id: v.id,
+				text: v.text,
+			}));
 		},
 		{
 			params: SolveQuestionParams,
 			isAuth: true,
+			headers: t.Object({
+				"x-active-session": t.Optional(
+					t.String({
+						format: "uuid",
+					}),
+				),
+			}),
 		},
 	)
 	.post(
