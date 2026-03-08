@@ -43,7 +43,7 @@ export const QuestionModel = t.Object({
 	id: t.String({
 		format: "uuid",
 	}),
-	type: t.String(), // QuestionType would be more strict, but DB returns string
+	type: t.String(),
 	multiAnswer: t.Nullable(t.Boolean()),
 	text: t.String(),
 });
@@ -71,37 +71,6 @@ export const VariantModel = t.Object({
 	}),
 });
 
-export const MatchingLeftItemModel = t.Object({
-	id: t.String({
-		format: "uuid",
-	}),
-	text: t.String(),
-});
-
-export const MatchingRightItemModel = t.Object({
-	id: t.String({
-		format: "uuid",
-	}),
-	text: t.String(),
-});
-
-export const MatchingConfigModel = t.Object({
-	leftItems: t.Array(MatchingLeftItemModel),
-	rightItems: t.Array(MatchingRightItemModel),
-	correctPairs: t.Array(
-		t.Object({
-			leftVariantId: t.String({
-				format: "uuid",
-			}),
-			rightVariantId: t.String({
-				format: "uuid",
-			}),
-			explainRight: t.Optional(t.String()),
-			explainWrong: t.Optional(t.String()),
-		}),
-	),
-});
-
 export const SubmittedVariantResponse = t.Object({
 	variantId: t.String({
 		format: "uuid",
@@ -111,22 +80,10 @@ export const SubmittedVariantResponse = t.Object({
 	explanation: t.String(),
 });
 
-export const MatchingPairResponse = t.Object({
-	key: t.String(),
-	value: t.String(),
-	isRight: t.Boolean(),
-	explanation: t.Nullable(t.String()),
-});
-
 export const ChosenVariantModel = t.Object({
 	id: t.String({
 		format: "uuid",
 	}),
-	userId: t.Optional(
-		t.String({
-			format: "uuid",
-		}),
-	),
 	quizId: t.String({
 		format: "uuid",
 	}),
@@ -140,6 +97,7 @@ export const ChosenVariantModel = t.Object({
 	),
 	answer: t.Nullable(t.Any()),
 	isRight: t.Nullable(t.Boolean()),
+	explanation: t.Nullable(t.String()),
 });
 
 // Response Models
@@ -147,29 +105,29 @@ export const SolveQuestionVariantsResponse = t.Object({
 	question: QuestionModel,
 	submittedVariants: t.Array(SubmittedVariantResponse),
 	allVariants: t.Array(VariantModel),
+	isRight: t.Boolean(),
 });
 
-// Response for matching questions
-export const SolveQuestionMatchingResponse = t.Object({
-	question: QuestionModel,
-	submittedAnswer: ChosenVariantModel,
-	isRight: t.Nullable(t.Boolean()),
-	pairs: t.Array(MatchingPairResponse),
-	variants: t.Array(VariantModel),
-	explanation: t.Optional(t.Nullable(t.String())),
-});
-
-// Response for other text questions (shortanswer, essay, numerical)
 export const SolveQuestionTextResponse = t.Object({
 	question: QuestionModel,
 	submittedAnswer: ChosenVariantModel,
 	isRight: t.Nullable(t.Boolean()),
 	explanation: t.Optional(t.Nullable(t.String())),
 	variants: t.Array(VariantModel),
-	pairs: t.Optional(t.Array(MatchingPairResponse)),
 });
 
-// Union of all text question responses
+export const SolveQuestionMatchingResponse = t.Object({
+	question: QuestionModel,
+	isRight: t.Boolean(),
+	pairsGraded: t.Array(
+		t.Object({
+			leftMatching: t.String(),
+			rightMatching: t.String(),
+			isRight: t.Boolean(),
+		}),
+	),
+});
+
 export const SolveQuestionTextResponseUnion = t.Union([
 	SolveQuestionMatchingResponse,
 	SolveQuestionTextResponse,
@@ -196,6 +154,17 @@ export const UpdateQuestionVariantsBody = t.Object({
 	variants: t.Array(UpdateQuestionVariant),
 });
 
-export const UpdateQuestionMatchingConfigBody = t.Object({
-	matchingConfig: MatchingConfigModel,
+// Regrade Model
+export const RegradeBody = t.Object({
+	submissionId: t.String({ format: "uuid" }),
+	isRight: t.Boolean(),
+	explanation: t.Optional(t.String()),
+});
+
+export const RegradeResponse = t.Object({
+	id: t.String({ format: "uuid" }),
+	questionId: t.String({ format: "uuid" }),
+	quizId: t.String({ format: "uuid" }),
+	isRight: t.Nullable(t.Boolean()),
+	explanation: t.Nullable(t.String()),
 });

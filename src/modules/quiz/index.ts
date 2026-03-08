@@ -25,9 +25,7 @@ export const quiz = new Elysia({
 		{
 			isAuth: true,
 			params: t.Object({
-				quizId: t.String({
-					format: "uuid",
-				}),
+				quizId: t.String({ format: "uuid" }),
 			}),
 			response: {
 				200: "plainQuiz",
@@ -42,9 +40,7 @@ export const quiz = new Elysia({
 		{
 			isTeacher: true,
 			params: t.Object({
-				quizId: t.String({
-					format: "uuid",
-				}),
+				quizId: t.String({ format: "uuid" }),
 			}),
 		},
 	)
@@ -56,9 +52,7 @@ export const quiz = new Elysia({
 		{
 			isTeacher: true,
 			params: t.Object({
-				quizId: t.String({
-					format: "uuid",
-				}),
+				quizId: t.String({ format: "uuid" }),
 			}),
 			body: "updateQuizBody",
 			response: {
@@ -79,38 +73,35 @@ export const quiz = new Elysia({
 			userService,
 		}) => {
 			const roles = await userService.getUserRoles(userId);
-
-			if (
+			const isTeacher =
 				Array.isArray(roles) &&
-				roles.some((role: { slug: string }) => role.slug === "teacher") &&
-				view === true
-			) {
-				return await quizService.getQuestionsByQuizId(
-					quizId,
-					undefined,
-					userId,
-				);
+				roles.some((role: { slug: string }) => role.slug === "teacher");
+
+			// Teachers with view flag can see questions directly
+			if (isTeacher && view === true) {
+				return await quizService.getQuestionsByQuizId(quizId);
 			}
 
+			// Students need an active session header
 			if (activeSessionId) {
 				const session = await sessionService.getSession(activeSessionId);
+
 				if (session.userId !== userId) {
 					throw status(403, "Forbidden");
 				}
-				return await quizService.getQuestionsByQuizId(
-					quizId,
-					activeSessionId,
-					userId,
-				);
+
+				if (session.quizId !== quizId) {
+					throw status(403, "Session does not belong to this quiz");
+				}
+
+				return await quizService.getQuestionsByQuizId(quizId);
 			}
 
-			return status(403, "Forbidden");
+			throw status(403, "Forbidden");
 		},
 		{
 			params: t.Object({
-				quizId: t.String({
-					format: "uuid",
-				}),
+				quizId: t.String({ format: "uuid" }),
 			}),
 			query: t.Object({
 				view: t.Optional(t.Boolean()),
@@ -118,9 +109,7 @@ export const quiz = new Elysia({
 			isAuth: true,
 			headers: t.Object({
 				"x-active-session": t.Optional(
-					t.String({
-						format: "uuid",
-					}),
+					t.String({ format: "uuid" }),
 				),
 			}),
 		},

@@ -101,6 +101,23 @@ export class SessionService {
 		return sessions[0];
 	}
 
+	async createSessionInTransaction(
+		tx: Transaction,
+		userId: string,
+		quizId: string,
+	) {
+		const [session] = await tx
+			.insert(quizSession)
+			.values({
+				userId,
+				quizId,
+				timeStart: new Date(),
+			})
+			.returning();
+
+		return session;
+	}
+
 	async createSession(userId: string, quizId: string) {
 		const activeSessions = await this.getActiveSessions(userId, quizId);
 		if (activeSessions.length > 0) {

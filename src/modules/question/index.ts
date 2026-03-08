@@ -1,10 +1,12 @@
 import Elysia, { status, t } from "elysia";
 import { authMacro } from "../auth/handlers";
 import { roleMacro } from "../roles/macro";
+import { UserService } from "../user/service";
 import {
 	ErrorResponse,
-	MatchingConfigModel,
 	QuestionModel,
+	RegradeBody,
+	RegradeResponse,
 	SolveQuestionBody,
 	SolveQuestionParams,
 	SolveQuestionTextResponseUnion,
@@ -21,6 +23,7 @@ export const question = new Elysia({
 	.use(authMacro)
 	.use(roleMacro)
 	.decorate("questionService", new QuestionService())
+	.decorate("userService", new UserService())
 	.get(
 		"/:id",
 		async ({ params: { id }, questionService }) => {
@@ -44,10 +47,28 @@ export const question = new Elysia({
 					multiAnswer: t.Nullable(t.Boolean()),
 					text: t.String(),
 					variants: t.Array(VariantModel),
-					matchingConfig: t.Optional(MatchingConfigModel),
 				}),
 				404: ErrorResponse,
 			},
+		},
+	)
+	.get(
+		"/:id/variants",
+		async ({ params: { id }, userId, userService, questionService }) => {
+			const roles = await userService.getUserRoles(userId);
+
+			if (
+				Array.isArray(roles) &&
+				roles.some((role: { slug: string }) => role.slug === "teacher")
+			) {
+				return await questionService.getQuestionVariants(id);
+			}
+
+			throw status(403, "Forbidden");
+		},
+		{
+			params: SolveQuestionParams,
+			isAuth: true,
 		},
 	)
 	.post(
@@ -102,6 +123,36 @@ export const question = new Elysia({
 				400: ErrorResponse,
 			},
 			body: SolveQuestionBody,
+		},
+	)
+	.post(
+		"/:id/regrade",
+		async ({
+			params: { id },
+			body: { submissionId, isRight, explanation },
+			questionService,
+		}) => {
+			const submission = await questionService.regradeSubmission(
+				submissionId,
+				isRight,
+				explanation,
+			);
+
+			if (submission.questionId !== id) {
+				throw status(400, "Submission does not belong to this question");
+			}
+
+			return submission;
+		},
+		{
+			isTeacher: true,
+			params: SolveQuestionParams,
+			body: RegradeBody,
+			response: {
+				200: RegradeResponse,
+				400: ErrorResponse,
+				404: ErrorResponse,
+			},
 		},
 	)
 	.put(

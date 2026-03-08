@@ -382,75 +382,25 @@ async function createMatchingQuestion(quizId: string, _themeName: string) {
 		},
 	];
 
-	// Create variants for left and right items
-	const leftVariants: Array<{
-		id: string;
-		text: string;
-		explainRight?: string;
-		explainWrong?: string;
-	}> = [];
-	const rightVariants: Array<{
-		id: string;
-		text: string;
-		explainRight?: string;
-		explainWrong?: string;
-	}> = [];
-
+	// Create one variant per pair using leftMatching/rightMatching columns
 	for (const pair of pairs) {
-		// Create left variant
-		const [leftVariant] = await db
+		const [variant] = await db
 			.insert(variants)
 			.values({
 				text: pair.left,
+				leftMatching: pair.left,
+				rightMatching: pair.right,
 				explainRight: pair.explainRight,
 				explainWrong: pair.explainWrong,
 			})
 			.returning();
 
-		// Create right variant
-		const [rightVariant] = await db
-			.insert(variants)
-			.values({
-				text: pair.right,
-				explainRight: pair.explainRight,
-				explainWrong: pair.explainWrong,
-			})
-			.returning();
-
-		leftVariants.push({
-			id: leftVariant.id,
-			text: leftVariant.text,
-			explainRight: leftVariant.explainRight || undefined,
-			explainWrong: leftVariant.explainWrong || undefined,
-		});
-
-		rightVariants.push({
-			id: rightVariant.id,
-			text: rightVariant.text,
-			explainRight: rightVariant.explainRight || undefined,
-			explainWrong: rightVariant.explainWrong || undefined,
+		await db.insert(questionsVariants).values({
+			questionId: question.id,
+			variantId: variant.id,
+			isRight: true,
 		});
 	}
-
-	// Create matching config
-	const matchingConfig = {
-		leftItems: leftVariants,
-		rightItems: rightVariants,
-		correctPairs: pairs.map((pair, index) => ({
-			leftVariantId: leftVariants[index].id,
-			rightVariantId: rightVariants[index].id,
-			explainRight: pair.explainRight,
-			explainWrong: pair.explainWrong,
-		})),
-	};
-
-	// Insert matching config into questions_variants
-	await db.insert(questionsVariants).values({
-		questionId: question.id,
-		variantId: null,
-		isRight: null,
-		matchingConfig: matchingConfig,
-	});
 }
 
 async function createNumericalQuestion(quizId: string, _themeName: string) {

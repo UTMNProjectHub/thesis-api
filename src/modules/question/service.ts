@@ -1,10 +1,11 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
 import {
 	chosenVariants,
 	questions,
 	questionsVariants,
+	sessionSubmits,
 	variants,
 } from "../../db/schema";
 import { SessionService } from "../session/service";
@@ -16,6 +17,7 @@ export class QuestionService {
 	constructor() {
 		this.sessionService = new SessionService();
 	}
+
 	async getQuestion(id: string) {
 		const questionQuery = await db.query.questions.findFirst({
 			where: eq(questions.id, id),
@@ -28,21 +30,8 @@ export class QuestionService {
 		return questionQuery;
 	}
 
-	async getQuestionVariantsMinimal(questionId: string) {
-		const variantsQuery = await db
-			.select({
-				id: variants.id,
-				text: variants.text,
-			})
-			.from(variants)
-			.fullJoin(questionsVariants, eq(variants.id, questionsVariants.variantId))
-			.where(eq(questionsVariants.questionId, questionId));
-
-		return variantsQuery;
-	}
-
 	async getQuestionVariants(questionId: string) {
-		const variantsQuery = await db
+		return db
 			.select({
 				id: variants.id,
 				text: variants.text,
@@ -56,13 +45,27 @@ export class QuestionService {
 				questionsVariantsId: questionsVariants.id,
 			})
 			.from(variants)
-			.innerJoin(
-				questionsVariants,
-				eq(variants.id, questionsVariants.variantId),
-			)
+			.innerJoin(questionsVariants, eq(variants.id, questionsVariants.variantId))
 			.where(eq(questionsVariants.questionId, questionId));
+	}
 
-		return variantsQuery;
+	/** Throws 409 if student already answered this question in the given session. */
+	private async assertNoDuplicateSubmit(sessionId: string, questionId: string) {
+		const duplicate = await db
+			.select({ id: chosenVariants.id })
+			.from(chosenVariants)
+			.innerJoin(sessionSubmits, eq(sessionSubmits.submitId, chosenVariants.id))
+			.where(
+				and(
+					eq(sessionSubmits.sessionId, sessionId),
+					eq(chosenVariants.questionId, questionId),
+				),
+			)
+			.limit(1);
+
+		if (duplicate.length > 0) {
+			throw status(409, "Question already answered in this session");
+		}
 	}
 
 	async submitQuestionVariants(
@@ -78,22 +81,33 @@ export class QuestionService {
 			quizId,
 		);
 
-		if (questionQuery.type !== "truefalse") {
+		if (
+			questionQuery.type !== "truefalse" &&
+			questionQuery.type !== "multichoice"
+		) {
 			throw status(
 				400,
 				"Bad Request: this method only supports truefalse and multichoice questions",
 			);
 		}
 
-		switch (questionQuery.type) {
-			case "truefalse":
-				if (variantIds.length !== 1) {
-					throw status(
-						400,
-						"Bad Request: truefalse question requires exactly one answer",
-					);
-				}
-				break;
+		if (questionQuery.type === "truefalse" && variantIds.length !== 1) {
+			throw status(
+				400,
+				"Bad Request: truefalse question requires exactly one answer",
+			);
+		}
+
+		if (questionQuery.type === "multichoice") {
+			if (variantIds.length === 0) {
+				throw status(400, "Bad Request: at least one answer is required");
+			}
+			if (questionQuery.multiAnswer === false && variantIds.length !== 1) {
+				throw status(
+					400,
+					"Bad Request: this question requires exactly one answer",
+				);
+			}
 		}
 
 		const validVariantIds = variantsQuery.map((v) => v.id).filter(Boolean);
@@ -107,9 +121,23 @@ export class QuestionService {
 			);
 		}
 
+		await this.assertNoDuplicateSubmit(session.id, questionId);
+
+		// For multichoice: all selected must be correct AND all correct must be selected
+		const correctVariantIds = new Set(
+			variantsQuery
+				.filter((v) => v.isRight === true)
+				.map((v) => v.id)
+				.filter(Boolean),
+		);
+		const selectedSet = new Set(variantIds);
+		const overallIsRight =
+			[...selectedSet].every((id) => correctVariantIds.has(id)) &&
+			[...correctVariantIds].every((id) => selectedSet.has(id));
+
 		const chosenVariantsArr = variantIds.map((variantId) => {
 			const questionVariant = variantsQuery.find((v) => v.id === variantId);
-			if (!questionVariant || !questionVariant.questionsVariantsId) {
+			if (!questionVariant?.questionsVariantsId) {
 				throw status(
 					400,
 					"Bad Request: could not find questionsVariants ID for variant",
@@ -119,11 +147,12 @@ export class QuestionService {
 				quizId,
 				questionId,
 				chosenId: questionVariant.questionsVariantsId,
+				isRight: questionVariant.isRight ?? false,
 			};
 		});
 
-		const _submittedVariants = await db.transaction(async (tx) => {
-			const inserted = await tx
+		const inserted = await db.transaction(async (tx) => {
+			const rows = await tx
 				.insert(chosenVariants)
 				.values(chosenVariantsArr)
 				.returning();
@@ -131,19 +160,18 @@ export class QuestionService {
 			await this.sessionService.addSubmitsToSessionInTransaction(
 				tx,
 				session.id,
-				inserted.map((cv) => cv.id),
+				rows.map((cv) => cv.id),
 			);
 
-			return inserted;
+			return rows;
 		});
 
-		// Get explanations for chosen variants
+		void inserted;
+
 		const explanations = variantIds
 			.map((variantId) => {
 				const variant = variantsQuery.find((v) => v.id === variantId);
-				if (!variant) {
-					return null;
-				}
+				if (!variant) return null;
 				return {
 					variantId: variant.id,
 					variantText: variant.text,
@@ -159,6 +187,7 @@ export class QuestionService {
 			question: questionQuery,
 			submittedVariants: explanations,
 			allVariants: variantsQuery,
+			isRight: overallIsRight,
 		};
 	}
 
@@ -175,12 +204,7 @@ export class QuestionService {
 			quizId,
 		);
 
-		// Validate question type
-		const textQuestionTypes = [
-			"shortanswer",
-			"essay",
-			"numerical",
-		];
+		const textQuestionTypes = ["shortanswer", "essay", "numerical"];
 		if (!textQuestionTypes.includes(questionQuery.type)) {
 			throw status(
 				400,
@@ -188,95 +212,35 @@ export class QuestionService {
 			);
 		}
 
+		if (!answerText || answerText.trim() === "") {
+			throw status(400, "Bad Request: answer cannot be empty");
+		}
+
+		if (questionQuery.type === "numerical") {
+			const numericalValue = parseFloat(answerText.trim());
+			if (Number.isNaN(numericalValue)) {
+				throw status(
+					400,
+					"Bad Request: numerical question requires a valid number",
+				);
+			}
+		}
+
+		await this.assertNoDuplicateSubmit(session.id, questionId);
+
 		let isRight: boolean | null = null;
 		let explanation: string | null = null;
 
-		switch (questionQuery.type) {
-			case "shortanswer":
-				if (!answerText || answerText.trim() === "") {
-					throw status(
-						400,
-						"Bad Request: shortanswer question requires a non-empty answer",
-					);
-				}
-				break;
-
-			case "essay":
-				if (!answerText || answerText.trim() === "") {
-					throw status(
-						400,
-						"Bad Request: essay question requires a non-empty answer",
-					);
-				}
-				break;
-
-			case "numerical": {
-				if (!answerText || answerText.trim() === "") {
-					throw status(
-						400,
-						"Bad Request: numerical question requires a non-empty answer",
-					);
-				}
-
-				const numericalValue = parseFloat(answerText.trim());
-				if (Number.isNaN(numericalValue)) {
-					throw status(
-						400,
-						"Bad Request: numerical question requires a valid number",
-					);
-				}
-
-				const correctVariant = variantsQuery.find((v) => v.isRight === true);
-				if (correctVariant?.text) {
-					const correctAnswer = parseFloat(correctVariant.text);
-					const userAnswer = parseFloat(answerText.trim());
-					isRight = Math.abs(correctAnswer - userAnswer) < 0.0001;
-
-					explanation = isRight
-						? correctVariant.explainRight
-						: correctVariant.explainWrong;
-				}
-
-				const session = await this.sessionService.getActiveSessionOrThrow(
-					userId,
-					quizId,
-				);
-
-				const [submitted] = await db.transaction(async (tx) => {
-					const [inserted] = await tx
-						.insert(chosenVariants)
-						.values({
-							quizId,
-							questionId,
-							answer: answerText.trim(),
-							isRight,
-						})
-						.returning();
-
-					await this.sessionService.addSubmitsToSessionInTransaction(
-						tx,
-						session.id,
-						[
-							inserted.id,
-						],
-					);
-
-					return [
-						inserted,
-					];
-				});
-
-				return {
-					question: questionQuery,
-					submittedAnswer: submitted,
-					isRight,
-					variants: variantsQuery,
-					explanation: null,
-				};
+		if (questionQuery.type === "numerical") {
+			const correctVariant = variantsQuery.find((v) => v.isRight === true);
+			if (correctVariant?.text) {
+				const correctAnswer = parseFloat(correctVariant.text);
+				const userAnswer = parseFloat(answerText.trim());
+				isRight = Math.abs(correctAnswer - userAnswer) < 0.0001;
+				explanation = isRight
+					? correctVariant.explainRight
+					: correctVariant.explainWrong;
 			}
-
-			default:
-				break;
 		}
 
 		const [submitted] = await db.transaction(async (tx) => {
@@ -294,14 +258,10 @@ export class QuestionService {
 			await this.sessionService.addSubmitsToSessionInTransaction(
 				tx,
 				session.id,
-				[
-					inserted.id,
-				],
+				[inserted.id],
 			);
 
-			return [
-				inserted,
-			];
+			return [inserted];
 		});
 
 		return {
@@ -327,11 +287,15 @@ export class QuestionService {
 		);
 
 		if (questionQuery.type !== "matching") {
-			throw status(400, "Bad Request");
+			throw status(
+				400,
+				"Bad Request: this method only supports matching questions",
+			);
 		}
 
-		let isRight = true;
-		const pairsmap = answerPairs.reduce(
+		await this.assertNoDuplicateSubmit(session.id, questionId);
+
+		const pairsMap = answerPairs.reduce(
 			(acc, pair) => {
 				acc[pair.leftMatching] = pair.rightMatching;
 				return acc;
@@ -339,14 +303,15 @@ export class QuestionService {
 			{} as Record<string, string>,
 		);
 
+		let overallIsRight = true;
 		const chosenVariantsData = variantsQuery.map((variant) => {
-			let correct = true;
+			let pairIsRight = true;
 
 			if (variant.leftMatching && variant.rightMatching) {
-				const userRight = pairsmap[variant.leftMatching];
+				const userRight = pairsMap[variant.leftMatching];
 				if (userRight !== variant.rightMatching) {
-					isRight = false;
-					correct = false;
+					overallIsRight = false;
+					pairIsRight = false;
 				}
 			}
 
@@ -355,36 +320,63 @@ export class QuestionService {
 				questionId,
 				chosenId: variant.variantId,
 				answerLeft: variant.leftMatching,
-				answerRight: pairsmap[variant.leftMatching as string] ?? null,
-				isRight: correct,
+				answerRight: pairsMap[variant.leftMatching as string] ?? null,
+				isRight: pairIsRight,
 			};
 		});
 
-		const [submitted] = await db.transaction(async (tx) => {
-			const [inserted] = await tx
+		const insertedRows = await db.transaction(async (tx) => {
+			const rows = await tx
 				.insert(chosenVariants)
 				.values(chosenVariantsData)
 				.returning();
 
+			// Link ALL inserted rows to the session
 			await this.sessionService.addSubmitsToSessionInTransaction(
 				tx,
 				session.id,
-				[
-					inserted.id,
-				],
+				rows.map((cv) => cv.id),
 			);
 
-			return [
-				inserted,
-			];
+			return rows;
 		});
 
 		return {
 			question: questionQuery,
-			submittedAnswer: submitted,
-			isRight,
-			variants: variantsQuery,
+			isRight: overallIsRight,
+			pairsGraded: insertedRows.map((cv) => ({
+				leftMatching: cv.answerLeft ?? "",
+				rightMatching: cv.answerRight ?? "",
+				isRight: cv.isRight ?? false,
+			})),
 		};
+	}
+
+	async regradeSubmission(
+		submissionId: string,
+		isRight: boolean,
+		explanation?: string,
+	) {
+		const existing = await db.query.chosenVariants.findFirst({
+			where: eq(chosenVariants.id, submissionId),
+		});
+
+		if (!existing) {
+			throw status(404, "Submission not found");
+		}
+
+		const updateData: { isRight: boolean; explanation?: string } = { isRight };
+		if (explanation !== undefined) {
+			updateData.explanation = explanation;
+		}
+
+		const [updated] = await db
+			.update(chosenVariants)
+			.set(updateData)
+			.where(eq(chosenVariants.id, submissionId))
+			.returning();
+
+		return updated;
 	}
 
 	async updateQuestion(
@@ -435,7 +427,6 @@ export class QuestionService {
 		}>,
 	) {
 		return await db.transaction(async (tx) => {
-			// Проверяем существование вопроса
 			const question = await tx.query.questions.findFirst({
 				where: eq(questions.id, questionId),
 			});
@@ -444,7 +435,6 @@ export class QuestionService {
 				throw status(404, "Question not found");
 			}
 
-			// для numerical вопросов должен быть только один правильный вариант
 			if (question.type === "numerical") {
 				if (variantsData.length !== 1 || !variantsData[0].isRight) {
 					throw status(
@@ -454,48 +444,42 @@ export class QuestionService {
 				}
 			}
 
-			// Получаем все существующие questionsVariants для этого вопроса
-			const existingQuestionsVariants =
-				await tx.query.questionsVariants.findMany({
-					where: eq(questionsVariants.questionId, questionId),
-				});
+			// Get existing questionsVariants
+			const existingQV = await tx.query.questionsVariants.findMany({
+				where: eq(questionsVariants.questionId, questionId),
+			});
 
-			// Получаем ID всех связанных variants
-			const variantIds = existingQuestionsVariants
+			const existingVariantIds = existingQV
 				.map((qv) => qv.variantId)
 				.filter((id): id is string => id !== null);
 
-			// Проверяем, используются ли эти variants в других вопросах (ПЕРЕД удалением)
-			let unusedVariantIds: string[] = [];
-			if (variantIds.length > 0) {
-				const allQuestionsVariants = await tx
-					.select()
-					.from(questionsVariants)
-					.where(inArray(questionsVariants.variantId, variantIds));
-
-				const usedVariantIds = new Set(
-					allQuestionsVariants
-						.map((qv) => qv.variantId)
-						.filter((id): id is string => id !== null),
-				);
-
-				// Удаляем только те variants, которые больше нигде не используются
-				unusedVariantIds = variantIds.filter((id) => !usedVariantIds.has(id));
-			}
-
-			// Удаляем старые questionsVariants
-			if (existingQuestionsVariants.length > 0) {
+			// Delete questionsVariants for this question
+			if (existingQV.length > 0) {
 				await tx
 					.delete(questionsVariants)
 					.where(eq(questionsVariants.questionId, questionId));
 			}
 
-			// Удаляем старые variants (если они больше нигде не используются)
-			if (unusedVariantIds.length > 0) {
-				await tx.delete(variants).where(inArray(variants.id, unusedVariantIds));
+			// Delete variants not used by any other question
+			if (existingVariantIds.length > 0) {
+				const stillUsed = await tx
+					.select({ variantId: questionsVariants.variantId })
+					.from(questionsVariants)
+					.where(inArray(questionsVariants.variantId, existingVariantIds));
+
+				const stillUsedIds = new Set(
+					stillUsed.map((r) => r.variantId).filter(Boolean),
+				);
+				const toDelete = existingVariantIds.filter(
+					(id) => !stillUsedIds.has(id),
+				);
+
+				if (toDelete.length > 0) {
+					await tx.delete(variants).where(inArray(variants.id, toDelete));
+				}
 			}
 
-			// Создаем новые variants и questionsVariants
+			// Insert new variants and link them
 			for (const variantData of variantsData) {
 				const [variant] = await tx
 					.insert(variants)
@@ -509,15 +493,13 @@ export class QuestionService {
 					.returning();
 
 				await tx.insert(questionsVariants).values({
-					questionId: questionId,
+					questionId,
 					variantId: variant.id,
 					isRight: variantData.isRight,
 				});
 			}
 
-			return {
-				success: true,
-			};
+			return { success: true };
 		});
 	}
 }
