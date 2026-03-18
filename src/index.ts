@@ -110,39 +110,49 @@ if (process.env.NODE_ENV !== "production") {
     );
   });
 }
+// Создаем асинхронную функцию для запуска
+async function startServer() {
+  // Ждем небольшую задержку
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
-// Initialize AMQP bridge before starting servers
-initializeAMQP()
-  .then(() => {
-    // Start HTTP API server
-    app.listen({
-      port: parseInt(process.env.ELYSIA_PORT as string),
-      hostname: "0.0.0.0",
-      reusePort: true,
-    });
-
-    // Start WebSocket server on separate port
-    wsApp.listen({
-      port: parseInt(process.env.WS_PORT as string),
-      hostname: "0.0.0.0",
-      reusePort: true,
-    });
-
-    console.log(
-      `🦊 HTTP API running at ${app.server?.hostname}:${app.server?.port}`,
-    );
-    console.log(
-      `🔌 WebSocket running at ${wsApp.server?.hostname}:${wsApp.server?.port}`,
-    );
-    console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(
-      `🔧 Precompilation: ${process.env.NODE_ENV === "production" ? "enabled" : "disabled"}`,
-    );
-  })
-  .catch((error) => {
-    console.error("Failed to initialize AMQP:", error);
-    process.exit(1);
+  // Start HTTP API server
+  app.listen({
+    port: parseInt(process.env.ELYSIA_PORT as string),
+    hostname: "0.0.0.0",
+    reusePort: true,
   });
+
+  // Start WebSocket server on separate port
+  wsApp.listen({
+    port: parseInt(process.env.WS_PORT as string),
+    hostname: "0.0.0.0",
+    reusePort: true,
+  });
+
+  console.log(
+    `🦊 HTTP API running at ${app.server?.hostname}:${app.server?.port}`,
+  );
+  console.log(
+    `🔌 WebSocket running at ${wsApp.server?.hostname}:${wsApp.server?.port}`,
+  );
+  console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(
+    `🔧 Precompilation: ${process.env.NODE_ENV === "production" ? "enabled" : "disabled"}`,
+  );
+
+  // Initialize AMQP bridge after servers are running
+  initializeAMQP()
+    .then(() => {
+      console.log("✅ AMQP bridge initialized");
+    })
+    .catch((error) => {
+      console.error("Failed to initialize AMQP bridge:", error);
+      process.exit(1);
+    });
+}
+
+// Запускаем сервер
+startServer();
 
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
@@ -155,3 +165,4 @@ process.on("SIGINT", async () => {
   await Promise.all([app.stop(), wsApp.stop()]);
   process.exit(0);
 });
+

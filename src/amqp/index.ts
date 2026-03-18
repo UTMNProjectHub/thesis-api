@@ -52,4 +52,3 @@ export async function initializeAMQP() {
     throw error;
   }
 }
-

@@ -81,7 +81,7 @@ export const question = new Elysia({ prefix: "/questions" })
       };
     },
     {
-      isTeacher: true,
+      hasPermission: "view_questions",
       params: SolveQuestionParams,
       response: {
         200: t.Object({
@@ -147,7 +147,7 @@ export const question = new Elysia({ prefix: "/questions" })
       return await questionService.updateQuestion(id, body);
     },
     {
-      isTeacher: true,
+      hasPermission: "update_question",
       params: SolveQuestionParams,
       body: UpdateQuestionBody,
       response: {
@@ -162,7 +162,7 @@ export const question = new Elysia({ prefix: "/questions" })
       return await questionService.updateQuestionVariants(id, body.variants);
     },
     {
-      isTeacher: true,
+      hasPermission: "update_question_variants",
       params: SolveQuestionParams,
       body: UpdateQuestionVariantsBody,
       response: {
@@ -194,7 +194,7 @@ export const question = new Elysia({ prefix: "/questions" })
       return await questionService.updateQuestionMatchingConfig(id, internalMatchingConfig);
     },
     {
-      isTeacher: true,
+      hasPermission: "update_question_matching", 
       params: SolveQuestionParams,
       body: UpdateQuestionMatchingConfigBody,
       response: {

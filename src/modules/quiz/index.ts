@@ -22,6 +22,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     },
     {
       isAuth: true,
+      hasPermission: "view_questions",
       params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       response: {
         200: "plainQuiz",
@@ -34,7 +35,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       return await quizService.deleteQuiz(quizId);
     },
     {
-      isTeacher: true,
+      hasPermission: "create_quiz",
       params: t.Object({ quizId: t.String({ format: "uuid" }) }),
     },
   )
@@ -44,7 +45,7 @@ export const quiz = new Elysia({ prefix: "/quizes" })
       return await quizService.updateQuiz(quizId, body);
     },
     {
-      isTeacher: true,
+      hasPermission: "create_quiz",
       params: t.Object({ quizId: t.String({ format: "uuid" }) }),
       body: "updateQuizBody",
       response: {
@@ -54,51 +55,48 @@ export const quiz = new Elysia({ prefix: "/quizes" })
     },
   )
   .get(
-    "/:quizId/questions",
-    async ({
-      params: { quizId },
-      query: { view },
-      quizService,
-      sessionService,
-      userId,
-      headers: { "x-active-session": activeSessionId },
-      userService,
-      set,
-    }) => {
-      const roles = await userService.getUserRoles(userId);
+  "/:quizId/questions",
+  async ({
+    params: { quizId },
+    query: { view },
+    quizService,
+    sessionService,
+    userId,
+    headers: { "x-active-session": activeSessionId },
+    userService,
+    set,
+  }) => {
+    const permissions = await userService.getUserPermissions(userId);
+    const canViewAllQuestions = permissions.includes("view_questions");
 
-      if (
-        Array.isArray(roles) &&
-        roles.some((role: any) => role.slug === "teacher") &&
-        view === true
-      ) {
-        return await quizService.getQuestionsByQuizId(
-          quizId,
-          undefined,
-          userId,
-        );
+    if (canViewAllQuestions && view === true) {
+      return await quizService.getQuestionsByQuizId(
+        quizId,
+        undefined,
+        userId,
+      );
+    }
+
+    if (activeSessionId) {
+      const session = await sessionService.getSession(activeSessionId);
+      if (session.userId !== userId) {
+        throw status(403, "Forbidden");
       }
+      return await quizService.getQuestionsByQuizId(
+        quizId,
+        activeSessionId,
+        userId,
+      );
+    }
 
-      if (activeSessionId) {
-        const session = await sessionService.getSession(activeSessionId);
-        if (session.userId !== userId) {
-          throw status(403, "Forbidden");
-        }
-        return await quizService.getQuestionsByQuizId(
-          quizId,
-          activeSessionId,
-          userId,
-        );
-      }
-
-      return status(403, "Forbidden");
-    },
-    {
-      params: t.Object({ quizId: t.String({ format: "uuid" }) }),
-      query: t.Object({ view: t.Optional(t.Boolean()) }),
-      isAuth: true,
-      headers: t.Object({
-        "x-active-session": t.Optional(t.String({ format: "uuid" })),
-      }),
-    },
-  );
+    return status(403, "Forbidden");
+  },
+  {
+    params: t.Object({ quizId: t.String({ format: "uuid" }) }),
+    query: t.Object({ view: t.Optional(t.Boolean()) }),
+    isAuth: true,
+    headers: t.Object({
+      "x-active-session": t.Optional(t.String({ format: "uuid" })),
+    }),
+  }
+);

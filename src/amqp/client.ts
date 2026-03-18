@@ -190,4 +190,3 @@ class AMQPClient {
 }
 
 export const amqpClient = AMQPClient.getInstance();
-

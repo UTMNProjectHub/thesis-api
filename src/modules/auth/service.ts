@@ -1,6 +1,6 @@
 import Bun from "bun";
 import { db } from "../../db";
-import { users } from "../../db/schema";
+import { users, usersToRoles, roles } from "../../db/schema";
 import { DrizzleQueryError, eq } from "drizzle-orm";
 import { status } from "elysia";
 import { redis } from "../../db/redis";
@@ -26,6 +26,19 @@ export class AuthService {
       }
 
       const user = userRecords[0];
+
+      const studentRole = await db.query.roles.findFirst({
+          where: eq(roles.slug, 'student')
+        });
+  
+      if (!studentRole) {
+        throw new Error('Роль "student" не найдена в базе данных');
+      }
+      
+      await db.insert(usersToRoles).values({
+          userId: user.id,
+          roleId: studentRole.id
+        }).returning();
 
       return {
         id: user.id,

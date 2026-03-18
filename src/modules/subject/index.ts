@@ -40,7 +40,7 @@ export const subject = new Elysia({ prefix: "/subject" })
       );
     },
     {
-      isTeacher: true,
+      hasPermission: "create_subject",
       body: "insertSubject",
     }
   )
@@ -66,7 +66,7 @@ export const subject = new Elysia({ prefix: "/subject" })
       return subjectService.getSubjectThemes(id, query.q);
     },
     {
-      isTeacher: true,
+      isAuth: true,
       response: {
         200: "multiplePlainThemes",
         404: t.String(),
@@ -91,7 +91,7 @@ export const subject = new Elysia({ prefix: "/subject" })
       );
     },
     {
-      isTeacher: true,
+      hasPermission: "create_theme",
       params: t.Object({
         id: t.Number(),
       }),
@@ -104,7 +104,7 @@ export const subject = new Elysia({ prefix: "/subject" })
       return subjectService.getSubjectFiles(id);
     },
     {
-      isTeacher: true,
+      hasPermission: "view_files",
       params: t.Object({
         id: t.Number(),
       }),
@@ -117,7 +117,7 @@ export const subject = new Elysia({ prefix: "/subject" })
       return subjectService.uploadFileToSubject(id, file, userId);
     },
     {
-      isTeacher: true,
+      hasPermission: "upload_files",
       params: t.Object({
         id: t.Number(),
       }),

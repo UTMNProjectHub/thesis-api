@@ -16,4 +16,15 @@ export const roleMacro = new Elysia()
 
       return { userId, roles };
     },
-  });
+  })
+
+  .macro("hasPermission", (permission: string) => ({
+    isAuth: true,
+    async resolve({ userId, userService }) {
+      const has = await userService.hasPermission(userId, permission);
+      if (!has) {
+        throw status(403, `Permission denied: ${permission}`);
+      }
+      return { userId };
+    }
+  }))

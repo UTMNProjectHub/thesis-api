@@ -15,7 +15,7 @@ export const theme = new Elysia({ prefix: "/theme" })
       return themeService.getThemeById(id);
     },
     {
-      isTeacher: true,
+      isAuth: true,
       params: t.Object({
         id: t.Number(),
       }),
@@ -27,7 +27,7 @@ export const theme = new Elysia({ prefix: "/theme" })
       return themeService.getThemeFiles(id);
     },
     {
-      isTeacher: true,
+      isAuth: true,
       params: t.Object({
         id: t.Number(),
       }),
@@ -38,7 +38,7 @@ export const theme = new Elysia({ prefix: "/theme" })
     return themeService.uploadFileToTheme(id, file, userId);
   },
     {
-      isTeacher: true,
+      hasPermission: "upload_files",
       params: t.Object({
         id: t.Number(),
       }),
@@ -53,7 +53,7 @@ export const theme = new Elysia({ prefix: "/theme" })
       return quizService.getQuizesByThemeId(id);
     },
     {
-      isTeacher: true,
+      isAuth: true,
       params: t.Object({
         id: t.Number(),
       }),
@@ -62,7 +62,7 @@ export const theme = new Elysia({ prefix: "/theme" })
   .get("/:id/summaries", ({ params: { id }, summaryService }) => {
     return summaryService.getSummariesByThemeId(id);
   }, {
-    isTeacher: true,
+    isAuth: true,
     params: t.Object({
       id: t.Number(),
     }),

@@ -4,7 +4,7 @@ import { roleMacro } from "../roles/macro";
 import { SessionService } from "./service";
 import { QuizService } from "../quiz/service";
 
-export const quizSession = new Elysia()
+export const quizSession = new Elysia({ prefix: "/quizes" })
   .use(authMacro)
   .use(roleMacro)
   .decorate("sessionService", new SessionService())
@@ -54,7 +54,7 @@ export const quizSession = new Elysia()
     },
     {
       params: t.Object({ quizId: t.String({ format: "uuid" }) }),
-      isTeacher: true,
+      hasPermission: "view_all_sessions",
     },
   )
   .post(

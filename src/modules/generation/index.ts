@@ -40,6 +40,7 @@ export const generation = new Elysia({ prefix: "/generation" })
     },
     {
       isAuth: true,
+      hasPermission: "create_quiz",
       body: "quizGenBody",
       response: {
         200: t.Object({
@@ -85,6 +86,7 @@ export const generation = new Elysia({ prefix: "/generation" })
     },
     {
       isAuth: true,
+      hasPermission: "create_summary",
       body: "summaryGenBody",
       response: {
         200: t.Object({
@@ -100,4 +102,3 @@ export const generation = new Elysia({ prefix: "/generation" })
       },
     },
   );
-

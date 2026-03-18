@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm"; // Добавьте inArray
 import { db } from "../../db";
-import { roles, users, usersToRoles } from "../../db/schema";
+import { roles, users, usersToRoles, permissions, rolesToPermissions } from "../../db/schema";
 import { status, t } from "elysia";
 import { UserModel } from "./model";
 import { cache } from "../../db/redis";
@@ -8,6 +8,7 @@ import { cache } from "../../db/redis";
 export class UserService {
   private userCacheTTL = 300;
   private rolesCacheTTL = 600;
+  private permissionsCacheTTL = 600; //кэш для разрешений
 
   private getUserCacheKey(userId: string): string {
     return `user:${userId}:profile`;
@@ -15,6 +16,11 @@ export class UserService {
 
   private getUserRolesCacheKey(userId: string): string {
     return `user:${userId}:roles`;
+  }
+
+  //ключ для кэша разрешений
+  private getUserPermissionsCacheKey(userId: string): string {
+    return `user:${userId}:permissions`;
   }
 
   async getUserById(userId: string) {
@@ -116,8 +122,80 @@ export class UserService {
     return roles;
   }
 
+  //получить все разрешения пользователя
+  async getUserPermissions(userId: string): Promise<string[]> {
+    const cacheKey = this.getUserPermissionsCacheKey(userId);
+    const cached = await cache.get<string[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    //получаем все роли пользователя
+    const userRoles = await this.getUserRoles(userId);
+    const roleIds = userRoles.map(role => role.id);
+
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    //получаем все разрешения для этих ролей
+    const rolesWithPermissions = await db.query.roles.findMany({
+      where: inArray(roles.id, roleIds),
+      with: {
+        rolesToPermissions: { 
+          with: {
+            permission: true
+          }
+        }
+      }
+    });
+
+    //собираем уникальные разрешения
+    const permissionsSet = new Set<string>();
+    rolesWithPermissions.forEach(role => {
+      role.rolesToPermissions.forEach(rp => {
+        if (rp.permission?.slug) {
+          permissionsSet.add(rp.permission.slug);
+        }
+      });
+    });
+
+    const permissionsList = Array.from(permissionsSet);
+    
+    //сохраняем в кэш
+    await cache.set(cacheKey, permissionsList, this.permissionsCacheTTL);
+    
+    return permissionsList;
+  }
+
+  //проверить конкретное разрешение
+  async hasPermission(userId: string, permissionSlug: string): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId);
+    return permissions.includes(permissionSlug);
+  }
+
+  //проверить хотя бы одно из разрешений
+  async hasAnyPermission(userId: string, permissionSlugs: string[]): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId);
+    return permissionSlugs.some(p => permissions.includes(p));
+  }
+
+  //проверить все разрешения
+  async hasAllPermissions(userId: string, permissionSlugs: string[]): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId);
+    return permissionSlugs.every(p => permissions.includes(p));
+  }
+
+  //сбросить кэш разрешений (когда права меняются)
+  async invalidatePermissionsCache(userId: string): Promise<void> {
+    const cacheKey = this.getUserPermissionsCacheKey(userId);
+    await cache.del(cacheKey);
+  }
+
   async invalidateUserCache(userId: string) {
     await cache.del(this.getUserCacheKey(userId));
     await cache.del(this.getUserRolesCacheKey(userId));
+    await cache.del(this.getUserPermissionsCacheKey(userId)); 
   }
 }

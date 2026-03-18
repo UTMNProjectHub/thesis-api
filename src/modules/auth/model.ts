@@ -11,7 +11,7 @@ export const strongPassword = t.String({
 const _createUser = createInsertSchema(users, {
   email: t.String({
     format: "email",
-    error: "Неверый формат почты",
+    error: "Неверный формат почты",
   }),
   password: strongPassword,
 });
