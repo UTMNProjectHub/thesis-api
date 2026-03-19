@@ -57,16 +57,6 @@ async function seed() {
       permissionId: perm.id
     }).onConflictDoNothing();
   }
-  
-  const studentPerms = allPerms.filter(p => 
-    ['view_files'].includes(p.slug)
-  );
-  for (const perm of studentPerms) {
-    await db.insert(rolesToPermissions).values({
-      roleId: studentRole.id,
-      permissionId: perm.id
-    }).onConflictDoNothing();
-  }
 
   console.log("Начальные данные добавлены");
 }
