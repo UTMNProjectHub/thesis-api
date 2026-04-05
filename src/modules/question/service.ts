@@ -318,7 +318,7 @@ export class QuestionService {
 			return {
 				quizId,
 				questionId,
-				chosenId: variant.variantId,
+				chosenId: variant.questionsVariantsId,
 				answerLeft: variant.leftMatching,
 				answerRight: pairsMap[variant.leftMatching as string] ?? null,
 				isRight: pairIsRight,

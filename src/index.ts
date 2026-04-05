@@ -50,7 +50,7 @@ const app = new Elysia({
 	precompile: true,
 	aot: process.env.NODE_ENV === "production",
 	serve: {
-		maxRequestBodySize: 1024 * 1024 * 10, // 10MB
+		maxRequestBodySize: 1024 * 1024 * 64, // 64mb
 	},
 });
 
