@@ -1,178 +1,235 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 
 // Mock jwt
 const mockJwt = {
-  verify: mock(),
+	verify: mock(),
 };
 
 mock.module("jsonwebtoken", () => ({
-  default: mockJwt,
-  verify: mockJwt.verify,
+	default: mockJwt,
+	verify: mockJwt.verify,
 }));
 
 describe("gRPC ValidateToken", () => {
-  beforeEach(() => {
-    mockJwt.verify.mockReset();
-  });
+	beforeEach(() => {
+		mockJwt.verify.mockReset();
+	});
 
-  it("should validate token successfully", () => {
-    const userId = "test-user-id";
-    const token = "valid-token";
-    
-    mockJwt.verify.mockReturnValue({ sub: userId });
+	it("should validate token successfully", () => {
+		const userId = "test-user-id";
+		const token = "valid-token";
 
-    const mockCall = {
-      request: { token },
-    };
+		mockJwt.verify.mockReturnValue({
+			sub: userId,
+		});
 
-    const mockCallback = mock();
+		const mockCall = {
+			request: {
+				token,
+			},
+		};
 
-    // Import the validateToken function directly
-    const validateToken = (call: any, callback: any) => {
-      const { token } = call.request;
+		const mockCallback = mock();
 
-      try {
-        const decoded = mockJwt.verify(token, process.env.JWT_SECRET as string) as any;
-        callback(null, { valid: true, user_id: decoded.sub });
-      } catch (error) {
-        callback(null, { valid: false, user_id: "" });
-      }
-    };
+		// Import the validateToken function directly
+		const validateToken = (call: any, callback: any) => {
+			const { token } = call.request;
 
-    validateToken(mockCall, mockCallback);
+			try {
+				const decoded = mockJwt.verify(
+					token,
+					process.env.JWT_SECRET as string,
+				) as any;
+				callback(null, {
+					valid: true,
+					user_id: decoded.sub,
+				});
+			} catch (_error) {
+				callback(null, {
+					valid: false,
+					user_id: "",
+				});
+			}
+		};
 
-    expect(mockJwt.verify).toHaveBeenCalledWith(token, process.env.JWT_SECRET);
-    expect(mockCallback).toHaveBeenCalledWith(null, { 
-      valid: true, 
-      user_id: userId 
-    });
-  });
+		validateToken(mockCall, mockCallback);
 
-  it("should handle invalid token", () => {
-    const token = "invalid-token";
-    
-    mockJwt.verify.mockImplementation(() => {
-      throw new Error("Invalid token");
-    });
+		expect(mockJwt.verify).toHaveBeenCalledWith(token, process.env.JWT_SECRET);
+		expect(mockCallback).toHaveBeenCalledWith(null, {
+			valid: true,
+			user_id: userId,
+		});
+	});
 
-    const mockCall = {
-      request: { token },
-    };
+	it("should handle invalid token", () => {
+		const token = "invalid-token";
 
-    const mockCallback = mock();
+		mockJwt.verify.mockImplementation(() => {
+			throw new Error("Invalid token");
+		});
 
-    const validateToken = (call: any, callback: any) => {
-      const { token } = call.request;
+		const mockCall = {
+			request: {
+				token,
+			},
+		};
 
-      try {
-        const decoded = mockJwt.verify(token, process.env.JWT_SECRET as string) as any;
-        callback(null, { valid: true, user_id: decoded.sub });
-      } catch (error) {
-        callback(null, { valid: false, user_id: "" });
-      }
-    };
+		const mockCallback = mock();
 
-    validateToken(mockCall, mockCallback);
+		const validateToken = (call: any, callback: any) => {
+			const { token } = call.request;
 
-    expect(mockCallback).toHaveBeenCalledWith(null, { 
-      valid: false, 
-      user_id: "" 
-    });
-  });
+			try {
+				const decoded = mockJwt.verify(
+					token,
+					process.env.JWT_SECRET as string,
+				) as any;
+				callback(null, {
+					valid: true,
+					user_id: decoded.sub,
+				});
+			} catch (_error) {
+				callback(null, {
+					valid: false,
+					user_id: "",
+				});
+			}
+		};
 
-  it("should handle expired token", () => {
-    const token = "expired-token";
-    
-    mockJwt.verify.mockImplementation(() => {
-      throw new Error("Token expired");
-    });
+		validateToken(mockCall, mockCallback);
 
-    const mockCall = {
-      request: { token },
-    };
+		expect(mockCallback).toHaveBeenCalledWith(null, {
+			valid: false,
+			user_id: "",
+		});
+	});
 
-    const mockCallback = mock();
+	it("should handle expired token", () => {
+		const token = "expired-token";
 
-    const validateToken = (call: any, callback: any) => {
-      const { token } = call.request;
+		mockJwt.verify.mockImplementation(() => {
+			throw new Error("Token expired");
+		});
 
-      try {
-        const decoded = mockJwt.verify(token, process.env.JWT_SECRET as string) as any;
-        callback(null, { valid: true, user_id: decoded.sub });
-      } catch (error) {
-        callback(null, { valid: false, user_id: "" });
-      }
-    };
+		const mockCall = {
+			request: {
+				token,
+			},
+		};
 
-    validateToken(mockCall, mockCallback);
+		const mockCallback = mock();
 
-    expect(mockCallback).toHaveBeenCalledWith(null, { 
-      valid: false, 
-      user_id: "" 
-    });
-  });
+		const validateToken = (call: any, callback: any) => {
+			const { token } = call.request;
 
-  it("should handle malformed token", () => {
-    const token = "malformed-token";
-    
-    mockJwt.verify.mockImplementation(() => {
-      throw new Error("Malformed token");
-    });
+			try {
+				const decoded = mockJwt.verify(
+					token,
+					process.env.JWT_SECRET as string,
+				) as any;
+				callback(null, {
+					valid: true,
+					user_id: decoded.sub,
+				});
+			} catch (_error) {
+				callback(null, {
+					valid: false,
+					user_id: "",
+				});
+			}
+		};
 
-    const mockCall = {
-      request: { token },
-    };
+		validateToken(mockCall, mockCallback);
 
-    const mockCallback = mock();
+		expect(mockCallback).toHaveBeenCalledWith(null, {
+			valid: false,
+			user_id: "",
+		});
+	});
 
-    const validateToken = (call: any, callback: any) => {
-      const { token } = call.request;
+	it("should handle malformed token", () => {
+		const token = "malformed-token";
 
-      try {
-        const decoded = mockJwt.verify(token, process.env.JWT_SECRET as string) as any;
-        callback(null, { valid: true, user_id: decoded.sub });
-      } catch (error) {
-        callback(null, { valid: false, user_id: "" });
-      }
-    };
+		mockJwt.verify.mockImplementation(() => {
+			throw new Error("Malformed token");
+		});
 
-    validateToken(mockCall, mockCallback);
+		const mockCall = {
+			request: {
+				token,
+			},
+		};
 
-    expect(mockCallback).toHaveBeenCalledWith(null, { 
-      valid: false, 
-      user_id: "" 
-    });
-  });
+		const mockCallback = mock();
 
-  it("should handle missing token", () => {
-    const token = "";
-    
-    mockJwt.verify.mockImplementation(() => {
-      throw new Error("No token provided");
-    });
+		const validateToken = (call: any, callback: any) => {
+			const { token } = call.request;
 
-    const mockCall = {
-      request: { token },
-    };
+			try {
+				const decoded = mockJwt.verify(
+					token,
+					process.env.JWT_SECRET as string,
+				) as any;
+				callback(null, {
+					valid: true,
+					user_id: decoded.sub,
+				});
+			} catch (_error) {
+				callback(null, {
+					valid: false,
+					user_id: "",
+				});
+			}
+		};
 
-    const mockCallback = mock();
+		validateToken(mockCall, mockCallback);
 
-    const validateToken = (call: any, callback: any) => {
-      const { token } = call.request;
+		expect(mockCallback).toHaveBeenCalledWith(null, {
+			valid: false,
+			user_id: "",
+		});
+	});
 
-      try {
-        const decoded = mockJwt.verify(token, process.env.JWT_SECRET as string) as any;
-        callback(null, { valid: true, user_id: decoded.sub });
-      } catch (error) {
-        callback(null, { valid: false, user_id: "" });
-      }
-    };
+	it("should handle missing token", () => {
+		const token = "";
 
-    validateToken(mockCall, mockCallback);
+		mockJwt.verify.mockImplementation(() => {
+			throw new Error("No token provided");
+		});
 
-    expect(mockCallback).toHaveBeenCalledWith(null, { 
-      valid: false, 
-      user_id: "" 
-    });
-  });
+		const mockCall = {
+			request: {
+				token,
+			},
+		};
+
+		const mockCallback = mock();
+
+		const validateToken = (call: any, callback: any) => {
+			const { token } = call.request;
+
+			try {
+				const decoded = mockJwt.verify(
+					token,
+					process.env.JWT_SECRET as string,
+				) as any;
+				callback(null, {
+					valid: true,
+					user_id: decoded.sub,
+				});
+			} catch (_error) {
+				callback(null, {
+					valid: false,
+					user_id: "",
+				});
+			}
+		};
+
+		validateToken(mockCall, mockCallback);
+
+		expect(mockCallback).toHaveBeenCalledWith(null, {
+			valid: false,
+			user_id: "",
+		});
+	});
 });

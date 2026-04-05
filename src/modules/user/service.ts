@@ -1,123 +1,124 @@
 import { eq } from "drizzle-orm";
+import { status } from "elysia";
 import { db } from "../../db";
-import { roles, users, usersToRoles } from "../../db/schema";
-import { status, t } from "elysia";
-import { UserModel } from "./model";
 import { cache } from "../../db/redis";
+import { users } from "../../db/schema";
 
 export class UserService {
-  private userCacheTTL = 300;
-  private rolesCacheTTL = 600;
+	private userCacheTTL = 300;
+	private rolesCacheTTL = 600;
 
-  private getUserCacheKey(userId: string): string {
-    return `user:${userId}:profile`;
-  }
+	private getUserCacheKey(userId: string): string {
+		return `user:${userId}:profile`;
+	}
 
-  private getUserRolesCacheKey(userId: string): string {
-    return `user:${userId}:roles`;
-  }
+	private getUserRolesCacheKey(userId: string): string {
+		return `user:${userId}:roles`;
+	}
 
-  async getUserById(userId: string) {
-    const cacheKey = this.getUserCacheKey(userId);
-    const cached = await cache.get<{
-      id: string;
-      email: string;
-      date_created: Date;
-      full_name: string | null;
-      avatar_url: string | null;
-      roles: Array<{
-        id: number;
-        title: string;
-        slug: string;
-        description: string | null;
-        date_created: Date | null;
-      }>;
-    }>(cacheKey);
+	async getUserById(userId: string) {
+		const cacheKey = this.getUserCacheKey(userId);
+		const cached = await cache.get<{
+			id: string;
+			email: string;
+			date_created: Date;
+			full_name: string | null;
+			avatar_url: string | null;
+			roles: Array<{
+				id: number;
+				title: string;
+				slug: string;
+				description: string | null;
+				date_created: Date | null;
+			}>;
+		}>(cacheKey);
 
-    if (cached) {
-      return cached;
-    }
+		if (cached) {
+			return cached;
+		}
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      with: {
-        usersToRoles: {
-          with: {
-            role: true,
-          },
-        },
-      },
-    });
+		const user = await db.query.users.findFirst({
+			where: eq(users.id, userId),
+			with: {
+				usersToRoles: {
+					with: {
+						role: true,
+					},
+				},
+			},
+		});
 
-    if (!user) {
-      throw status(404, "Not Found");
-    }
+		if (!user) {
+			throw status(404, "Not Found");
+		}
 
-    const result = {
-      id: user.id,
-      email: user.email,
-      date_created: user.date_created,
-      full_name: user.full_name,
-      avatar_url: user.avatar_url,
-      roles: user.usersToRoles.map((utr) => utr.role),
-    };
+		const result = {
+			id: user.id,
+			email: user.email,
+			date_created: user.date_created,
+			full_name: user.full_name,
+			avatar_url: user.avatar_url,
+			roles: user.usersToRoles.map((utr) => utr.role),
+		};
 
-    await cache.set(cacheKey, result, this.userCacheTTL);
+		await cache.set(cacheKey, result, this.userCacheTTL);
 
-    return result;
-  }
+		return result;
+	}
 
-  async editUserById(userId: string, email?: string, full_name?: string) {
-    const updatedUser = await db
-      .update(users)
-      .set({
-        email: email,
-        full_name: full_name,
-      })
-      .where(eq(users.id, userId))
-      .returning();
+	async editUserById(userId: string, email?: string, full_name?: string) {
+		const updatedUser = await db
+			.update(users)
+			.set({
+				email: email,
+				full_name: full_name,
+			})
+			.where(eq(users.id, userId))
+			.returning();
 
-    if (updatedUser.length === 0) {
-      throw status(404, "Not Found");
-    }
+		if (updatedUser.length === 0) {
+			throw status(404, "Not Found");
+		}
 
-    await cache.del(this.getUserCacheKey(userId));
+		await cache.del(this.getUserCacheKey(userId));
 
-    return { ...updatedUser[0] };
-  }
+		return {
+			...updatedUser[0],
+		};
+	}
 
-  async getUserRoles(userId: string) {
-    const cacheKey = this.getUserRolesCacheKey(userId);
-    const cached = await cache.get(cacheKey);
+	async getUserRoles(userId: string) {
+		const cacheKey = this.getUserRolesCacheKey(userId);
+		const cached = await cache.get(cacheKey);
 
-    if (cached) {
-      return cached;
-    }
+		if (cached) {
+			return cached;
+		}
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      with: {
-        usersToRoles: {
-          with: {
-            role: true,
-          },
-        },
-      },
-    });
+		const user = await db.query.users.findFirst({
+			where: eq(users.id, userId),
+			with: {
+				usersToRoles: {
+					with: {
+						role: true,
+					},
+				},
+			},
+		});
 
-    if (!user) {
-      throw status(404, "Not Found");
-    }
+		if (!user) {
+			throw status(404, "Not Found");
+		}
 
-    const roles = user.usersToRoles.map((utr) => utr.role);
+		const roles = user.usersToRoles.map((utr) => utr.role);
 
-    await cache.set(cacheKey, roles, this.rolesCacheTTL);
+		await cache.set(cacheKey, roles, this.rolesCacheTTL);
 
-    return roles;
-  }
+		return roles;
+	}
 
-  async invalidateUserCache(userId: string) {
-    await cache.del(this.getUserCacheKey(userId));
-    await cache.del(this.getUserRolesCacheKey(userId));
-  }
+	async invalidateUserCache(userId: string) {
+		await cache.del(this.getUserCacheKey(userId));
+		await cache.del(this.getUserRolesCacheKey(userId));
+	}
 }
