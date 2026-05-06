@@ -1,11 +1,11 @@
-import Elysia, { t, status } from "elysia";
+import Elysia, { status, t } from "elysia";
 import { authMacro } from "../auth/handlers";
-import { roleMacro } from "../roles/macro";
-import { QuizService } from "./service";
-import { QuizModel } from "./model";
 import { QuestionService } from "../question/service";
+import { roleMacro } from "../roles/macro";
 import { SessionService } from "../session/service";
 import { UserService } from "../user/service";
+import { QuizModel } from "./model";
+import { QuizService } from "./service";
 
 export const quiz = new Elysia({ prefix: "/quizes" })
   .decorate("quizService", new QuizService())

@@ -1,46 +1,47 @@
 if (!process.env.JWT_SECRET) {
-  throw new Error("Please set JWT_SECRET in dotenv");
+	throw new Error("Please set JWT_SECRET in dotenv");
 }
 
 if (!process.env.ELYSIA_PORT) {
-  throw new Error("Please set ELYSIA_PORT in dotenv");
+	throw new Error("Please set ELYSIA_PORT in dotenv");
 }
 
 if (!process.env.RPC_PORT) {
-  throw new Error("Please set RPC_PORT in dotenv");
+	throw new Error("Please set RPC_PORT in dotenv");
 }
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("Please set DATABASE_URL in dotenv");
+	throw new Error("Please set DATABASE_URL in dotenv");
 }
 
 if (!process.env.REDIS_URL) {
-  throw new Error("Please set REDIS_URL in dotenv");
+	throw new Error("Please set REDIS_URL in dotenv");
 }
 
 if (!process.env.AMQP_URL) {
-  throw new Error("Please set AMQP_URL in dotenv");
+	throw new Error("Please set AMQP_URL in dotenv");
 }
 
 if (!process.env.WS_PORT) {
-  throw new Error("Please set WS_PORT in dotenv");
+	throw new Error("Please set WS_PORT in dotenv");
 }
 
-import jwt from "@elysiajs/jwt";
 import openapi from "@elysiajs/openapi";
-import { Elysia, status } from "elysia";
+import { Elysia } from "elysia";
 import { auth } from "./modules/auth";
 import { user } from "./modules/user";
 import "./rpc";
-import { profile } from "./modules/profile";
 import cors from "@elysiajs/cors";
+import staticPlugin from "@elysiajs/static";
+import { initializeAMQP } from "./amqp";
+import { file } from "./modules/file";
+import { generation } from "./modules/generation";
+import { profile } from "./modules/profile";
+import { question } from "./modules/question";
+import { quiz } from "./modules/quiz";
+import { quizSession } from "./modules/session";
 import { subject } from "./modules/subject";
 import { theme } from "./modules/themes";
-import { file } from "./modules/file";
-import { quiz } from "./modules/quiz";
-import { question } from "./modules/question";
-import { generation } from "./modules/generation";
-import { initializeAMQP } from "./amqp";
 import { websocket } from "./modules/websocket";
 import { opentelemetry } from "@elysiajs/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
@@ -51,12 +52,12 @@ import { admin } from "./modules/admin";
 
 // HTTP API app
 const app = new Elysia({
-  prefix: "/api",
-  precompile: true,
-  aot: process.env.NODE_ENV === "production",
-  serve: {
-    maxRequestBodySize: 1024 * 1024 * 10, // 10MB
-  },
+	prefix: "/api",
+	precompile: true,
+	aot: process.env.NODE_ENV === "production",
+	serve: {
+		maxRequestBodySize: 1024 * 1024 * 64, // 64mb
+	},
 });
 
 // WebSocket app (separate server)
@@ -64,24 +65,22 @@ const wsApp = new Elysia();
 
 app.use(staticPlugin());
 
-app.use(
-  openapi(),
-);
+app.use(openapi());
 
 app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV == "production"
-        ? RegExp('^https:\/\/.*\.saveitsky\.ru$')
-        : true,
-    credentials: true,
-  }),
+	cors({
+		origin:
+			process.env.NODE_ENV === "production"
+				? /^https:\/\/.*.saveitsky.ru$/
+				: true,
+		credentials: true,
+	}),
 );
 
 app.get("/health", () => ({
-  status: "ok",
-  timestamp: Date.now(),
-  uptime: process.uptime(),
+	status: "ok",
+	timestamp: Date.now(),
+	uptime: process.uptime(),
 }));
 
 app.use(auth);
@@ -92,7 +91,7 @@ app.use(theme);
 app.use(file);
 app.use(quiz);
 app.use(question);
-app.use(generation)
+app.use(generation);
 app.use(quizSession);
 app.use(admin);
 
@@ -100,17 +99,17 @@ app.use(admin);
 wsApp.use(websocket);
 
 app.onError(({ error, code }) => {
-  console.error(`[${code}]`, error);
+	console.error(`[${code}]`, error);
 
-  return error;
+	return error;
 });
 
 if (process.env.NODE_ENV !== "production") {
-  app.onRequest(({ request }) => {
-    console.log(
-      `[${new Date().toISOString()}] ${request.method} ${request.url}`,
-    );
-  });
+	app.onRequest(({ request }) => {
+		console.log(
+			`[${new Date().toISOString()}] ${request.method} ${request.url}`,
+		);
+	});
 }
 // Создаем асинхронную функцию для запуска
 async function startServer() {
@@ -157,14 +156,20 @@ async function startServer() {
 startServer();
 
 process.on("SIGTERM", async () => {
-  console.log("SIGTERM received, shutting down gracefully...");
-  await Promise.all([app.stop(), wsApp.stop()]);
-  process.exit(0);
+	console.log("SIGTERM received, shutting down gracefully...");
+	await Promise.all([
+		app.stop(),
+		wsApp.stop(),
+	]);
+	process.exit(0);
 });
 
 process.on("SIGINT", async () => {
-  console.log("SIGINT received, shutting down gracefully...");
-  await Promise.all([app.stop(), wsApp.stop()]);
-  process.exit(0);
+	console.log("SIGINT received, shutting down gracefully...");
+	await Promise.all([
+		app.stop(),
+		wsApp.stop(),
+	]);
+	process.exit(0);
 });
 

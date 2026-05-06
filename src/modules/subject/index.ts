@@ -1,10 +1,10 @@
 import { Elysia, t } from "elysia";
 import { authMacro } from "../auth/handlers";
+import { roleMacro } from "../roles/macro";
+import { ThemeModel } from "../themes/model";
+import { ThemeService } from "../themes/service";
 import { SubjectModel } from "./model";
 import { SubjectService } from "./service";
-import { roleMacro } from "../roles/macro";
-import { ThemeService } from "../themes/service";
-import { ThemeModel } from "../themes/model";
 
 export const subject = new Elysia({ prefix: "/subject" })
   .use(authMacro)

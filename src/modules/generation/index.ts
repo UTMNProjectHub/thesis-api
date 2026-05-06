@@ -1,22 +1,24 @@
-import { Elysia, status, t } from "elysia";
-import { authMacro } from "../auth/handlers";
-import { roleMacro } from "../roles/macro";
-import { GenerationModel } from "./model";
+import { Elysia, t } from "elysia";
 import { amqpClient } from "../../amqp/client";
 import { QUEUES } from "../../amqp/queues";
+import { authMacro } from "../auth/handlers";
 import { QuizService } from "../quiz/service";
+import { roleMacro } from "../roles/macro";
 import { SummaryService } from "../summary/service";
+import { GenerationModel } from "./model";
 
-export const generation = new Elysia({ prefix: "/generation" })
-  .use(authMacro)
-  .use(roleMacro)
-  .decorate("quizService", new QuizService())
-  .decorate("summaryService", new SummaryService())
-  .model(GenerationModel)
-  .post(
-    "/quiz",
-    async ({ body, set }) => {
-      const quizId = Bun.randomUUIDv7();
+export const generation = new Elysia({
+	prefix: "/generation",
+})
+	.use(authMacro)
+	.use(roleMacro)
+	.decorate("quizService", new QuizService())
+	.decorate("summaryService", new SummaryService())
+	.model(GenerationModel)
+	.post(
+		"/quiz",
+		async ({ body, set }) => {
+			const quizId = Bun.randomUUIDv7();
 
       try {
         await amqpClient.publishToQueue(QUEUES.QUIZ_GENERATION_REQUEST, {

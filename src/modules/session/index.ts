@@ -1,8 +1,8 @@
 import Elysia, { status, t } from "elysia";
 import { authMacro } from "../auth/handlers";
+import { QuizService } from "../quiz/service";
 import { roleMacro } from "../roles/macro";
 import { SessionService } from "./service";
-import { QuizService } from "../quiz/service";
 
 export const quizSession = new Elysia({ prefix: "/quizes" })
   .use(authMacro)

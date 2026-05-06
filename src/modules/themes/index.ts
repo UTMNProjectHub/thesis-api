@@ -1,8 +1,8 @@
 import Elysia, { t } from "elysia";
-import { roleMacro } from "../roles/macro";
-import { ThemeService } from "./service";
 import { QuizService } from "../quiz/service";
+import { roleMacro } from "../roles/macro";
 import { SummaryService } from "../summary/service";
+import { ThemeService } from "./service";
 
 export const theme = new Elysia({ prefix: "/theme" })
   .use(roleMacro)

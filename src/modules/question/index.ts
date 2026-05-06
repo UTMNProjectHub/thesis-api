@@ -1,79 +1,37 @@
 import Elysia, { status, t } from "elysia";
 import { authMacro } from "../auth/handlers";
 import { roleMacro } from "../roles/macro";
-import { QuestionService } from "./service";
+import { SessionService } from "../session/service";
+import { UserService } from "../user/service";
 import {
-  SolveQuestionParams,
-  SolveQuestionBody,
-  SolveQuestionVariantsResponse,
-  SolveQuestionTextResponseUnion,
-  ErrorResponse,
-  UpdateQuestionBody,
-  UpdateQuestionVariantsBody,
-  UpdateQuestionMatchingConfigBody,
-  QuestionModel,
-  VariantModel,
-  MatchingConfigModel,
+	ErrorResponse,
+	QuestionModel,
+	RegradeBody,
+	RegradeResponse,
+	SolveQuestionBody,
+	SolveQuestionParams,
+	SolveQuestionTextResponseUnion,
+	SolveQuestionVariantsResponse,
+	UpdateQuestionBody,
+	UpdateQuestionVariantsBody,
+	VariantModel,
 } from "./model";
-import type { MatchingConfig } from "./utils";
+import { QuestionService } from "./service";
+import { shuffleWithSeed } from "./utils";
 
-export const question = new Elysia({ prefix: "/questions" })
-  .use(authMacro)
-  .use(roleMacro)
-  .decorate("questionService", new QuestionService())
-  .get(
-    "/:id",
-    async ({ params: { id }, questionService }) => {
-      const question = await questionService.getQuestion(id);
-      const variants = await questionService.getQuestionVariants(id);
-      const filteredVariants = variants
-        .filter((v) => v.variantId !== null && v.isRight !== null)
-        .map((v) => ({
-          id: v.id,
-          text: v.text,
-          explainRight: v.explainRight,
-          explainWrong: v.explainWrong,
-          isRight: v.isRight as boolean,
-          questionId: v.questionId,
-          variantId: v.variantId as string,
-          questionsVariantsId: v.questionsVariantsId,
-        }));
-
-
-      if (question.type === "matching") {
-        const matchingConfig = await questionService.getQuestionMatchingConfig(id);
-        if (matchingConfig) {
-          const apiMatchingConfig = {
-            leftItems: matchingConfig.leftItems.map((item) => ({
-              id: item.id,
-              text: item.text,
-            })),
-            rightItems: matchingConfig.rightItems.map((item) => ({
-              id: item.id,
-              text: item.text,
-            })),
-            correctPairs: matchingConfig.correctPairs,
-          };
-          return {
-            ...question,
-            variants: filteredVariants,
-            matchingConfig: apiMatchingConfig,
-          };
-        }
-        return {
-          ...question,
-          variants: filteredVariants,
-        };
-      }
-
-      // Для numerical вопросов возвращаем единственный правильный вариант
-      if (question.type === "numerical") {
-        const numericalVariant = filteredVariants.find((v) => v.isRight === true);
-        return {
-          ...question,
-          variants: numericalVariant ? [numericalVariant] : [],
-        };
-      }
+export const question = new Elysia({
+	prefix: "/questions",
+})
+	.use(authMacro)
+	.use(roleMacro)
+	.decorate("questionService", new QuestionService())
+	.decorate("sessionService", new SessionService())
+	.decorate("userService", new UserService())
+	.get(
+		"/:id",
+		async ({ params: { id }, questionService }) => {
+			const question = await questionService.getQuestion(id);
+			const variants = await questionService.getQuestionVariants(id);
 
       return {
         ...question,
@@ -108,23 +66,32 @@ export const question = new Elysia({ prefix: "/questions" })
         return status(400, "Bad Request");
       }
 
-      if (answerIds) {
-        return await questionService.submitQuestionVariants(
-          userId!,
-          quizId,
-          id,
-          answerIds,
-        );
-      }
+			if (answerIds) {
+				return await questionService.submitQuestionVariants(
+					userId,
+					quizId,
+					id,
+					answerIds,
+				);
+			}
 
-      if (answerText) {
-        return await questionService.submitQuestionText(
-          userId!,
-          quizId,
-          id,
-          answerText,
-        );
-      }
+			if (answerText) {
+				return await questionService.submitQuestionText(
+					userId,
+					quizId,
+					id,
+					answerText,
+				);
+			}
+
+			if (answerPairs) {
+				return await questionService.submitQuestionPairs(
+					userId,
+					quizId,
+					id,
+					answerPairs,
+				);
+			}
 
       return status(400, "Bad Request");
     },

@@ -1,0 +1,1 @@
+ALTER TABLE "thesis"."chosen_variants" ADD COLUMN "explanation" text;
