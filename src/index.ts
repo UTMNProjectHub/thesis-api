@@ -47,6 +47,7 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import staticPlugin from "@elysiajs/static";
 import { quizSession } from "./modules/session";
+import { admin } from "./modules/admin";
 
 // HTTP API app
 const app = new Elysia({
@@ -93,6 +94,7 @@ app.use(quiz);
 app.use(question);
 app.use(generation)
 app.use(quizSession);
+app.use(admin);
 
 // WebSocket server setup
 wsApp.use(websocket);
