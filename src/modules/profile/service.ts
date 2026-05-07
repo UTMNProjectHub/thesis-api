@@ -1,62 +1,62 @@
 import { password } from "bun";
-import { db } from "../../db";
-import { status } from "elysia";
-import { users } from "../../db/schema";
 import { eq } from "drizzle-orm";
+import { status } from "elysia";
+import { db } from "../../db";
 import { cache } from "../../db/redis";
+import { users } from "../../db/schema";
 
 export class ProfileService {
-  private getUserCacheKey(userId: string): string {
-    return `user:${userId}:profile`;
-  }
+	private getUserCacheKey(userId: string): string {
+		return `user:${userId}:profile`;
+	}
 
-  private getUserRolesCacheKey(userId: string): string {
-    return `user:${userId}:roles`;
-  }
+	private getUserRolesCacheKey(userId: string): string {
+		return `user:${userId}:roles`;
+	}
 
-  async changeUserPassword(
-    userId: string,
-    old_password: string,
-    new_password: string,
-  ) {
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-    });
+	async changeUserPassword(
+		userId: string,
+		old_password: string,
+		new_password: string,
+	) {
+		const user = await db.query.users.findFirst({
+			where: eq(users.id, userId),
+		});
 
-    if (!user) {
-      throw status(404, "Not Found");
-    }
+		if (!user) {
+			throw status(404, "Not Found");
+		}
 
-    let isValid = false;
+		let isValid = false;
 
-    try {
-      isValid = await password.verify(old_password, user.password);
-    } catch (err) {
-      throw status(401, "Unauthorized");
-    }
+		try {
+			isValid = await password.verify(old_password, user.password);
+		} catch (_err) {
+			throw status(401, "Unauthorized");
+		}
 
-    if (!isValid) {
-      throw status(401, "Unauthorized");
-    }
+		if (!isValid) {
+			throw status(401, "Unauthorized");
+		}
 
-    const hashed_pwd = await password.hash(new_password);
+		const hashed_pwd = await password.hash(new_password);
 
-    await db
-      .update(users)
-      .set({
-        password: hashed_pwd,
-      })
-      .where(eq(users.id, userId));
+		await db
+			.update(users)
+			.set({
+				password: hashed_pwd,
+			})
+			.where(eq(users.id, userId));
 
-    await this.invalidateUserCache(userId);
-  }
+		await this.invalidateUserCache(userId);
+	}
 
-  async invalidateUserCache(userId: string) {
-    try {
-      await cache.del(this.getUserCacheKey(userId));
-      await cache.del(this.getUserRolesCacheKey(userId));
-    } catch (error) {
-      console.error("Error invalidating user cache:", error);
-    }
-  }
+	async invalidateUserCache(userId: string) {
+		try {
+			await cache.del(this.getUserCacheKey(userId));
+			await cache.del(this.getUserRolesCacheKey(userId));
+		} catch (error) {
+			console.error("Error invalidating user cache:", error);
+		}
+	}
 }
