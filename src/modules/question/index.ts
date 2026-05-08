@@ -33,38 +33,6 @@ export const question = new Elysia({
 			const question = await questionService.getQuestion(id);
 			const variants = await questionService.getQuestionVariants(id);
 
-      return {
-        ...question,
-        variants: filteredVariants,
-      };
-    },
-    {
-      hasPermission: "view_questions",
-      params: SolveQuestionParams,
-      response: {
-        200: t.Object({
-          id: t.String({ format: "uuid" }),
-          type: t.String(),
-          multiAnswer: t.Nullable(t.Boolean()),
-          text: t.String(),
-          variants: t.Array(VariantModel),
-          matchingConfig: t.Optional(MatchingConfigModel),
-        }),
-        404: ErrorResponse,
-      },
-    }
-  )
-  .post(
-    "/:id/solve",
-    async ({
-      userId,
-      params: { id },
-      body: { answerIds, answerText, quizId },
-      questionService,
-    }) => {
-      if (!answerIds && !answerText) {
-        return status(400, "Bad Request");
-      }
 			return {
 				...question,
 				variants,
@@ -233,7 +201,7 @@ export const question = new Elysia({
 			return submission;
 		},
 		{
-			hasPermission: "update_question",
+			isTeacher: true,
 			params: SolveQuestionParams,
 			body: RegradeBody,
 			response: {
@@ -249,7 +217,7 @@ export const question = new Elysia({
 			return await questionService.updateQuestion(id, body);
 		},
 		{
-      		hasPermission: "update_question_variants",
+			isTeacher: true,
 			params: SolveQuestionParams,
 			body: UpdateQuestionBody,
 			response: {
@@ -270,7 +238,7 @@ export const question = new Elysia({
 			return await questionService.updateQuestionVariants(id, variants);
 		},
 		{
-      		hasPermission: "update_question_matching", 
+			isTeacher: true,
 			params: SolveQuestionParams,
 			body: UpdateQuestionVariantsBody,
 			response: {

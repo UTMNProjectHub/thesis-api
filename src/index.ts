@@ -46,8 +46,6 @@ import { websocket } from "./modules/websocket";
 import { opentelemetry } from "@elysiajs/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import staticPlugin from "@elysiajs/static";
-import { quizSession } from "./modules/session";
 import { admin } from "./modules/admin";
 
 // HTTP API app

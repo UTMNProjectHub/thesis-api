@@ -1,45 +1,46 @@
 import Bun from "bun";
 import { db } from "../../db";
 import { users, usersToRoles, roles } from "../../db/schema";
-import { DrizzleQueryError, eq } from "drizzle-orm";
+import { eq, DrizzleQueryError } from "drizzle-orm";
 import { status } from "elysia";
 import postgres from "postgres";
-import { db } from "../../db";
-import { users } from "../../db/schema";
 
 export class AuthService {
-	async createUser(email: string, password: string, full_name: string) {
-		try {
-			const hashed = await Bun.password.hash(password);
+  async createUser(email: string, password: string, full_name: string) {
+    try {
+      const hashed = await Bun.password.hash(password);
 
-			const userRecords = await db
-				.insert(users)
-				.values({
-					email: email,
-					password: hashed,
-					full_name: full_name,
-					date_created: new Date(),
-				})
-				.returning();
+      const userRecords = await db
+        .insert(users)
+        .values({
+          email: email,
+          password: hashed,
+          full_name: full_name,
+          date_created: new Date(),
+        })
+        .returning();
 
-			if (userRecords.length === 0) {
-				throw status(500, "Internal Server Error");
-			}
+      if (userRecords.length === 0) {
+        throw status(500, "Internal Server Error");
+      }
 
-			const user = userRecords[0];
+      const user = userRecords[0];
 
       const studentRole = await db.query.roles.findFirst({
-          where: eq(roles.slug, 'student')
-        });
-  
+        where: eq(roles.slug, "student"),
+      });
+
       if (!studentRole) {
         throw new Error('Роль "student" не найдена в базе данных');
       }
-      
-      await db.insert(usersToRoles).values({
+
+      await db
+        .insert(usersToRoles)
+        .values({
           userId: user.id,
-          roleId: studentRole.id
-        }).returning();
+          roleId: studentRole.id,
+        })
+        .returning();
 
       return {
         id: user.id,
@@ -51,7 +52,7 @@ export class AuthService {
     } catch (error) {
       if (error instanceof DrizzleQueryError) {
         if (error.cause instanceof postgres.PostgresError) {
-          if (error.cause.constraint_name == "users_email_unique") {
+          if (error.cause.constraint_name === "users_email_unique") {
             throw status(409, "User with this email already exists");
           }
         }
@@ -59,51 +60,30 @@ export class AuthService {
       throw error;
     }
   }
-			return {
-				id: user.id,
-				email: user.email,
-				date_created: user.date_created,
-				full_name: user.full_name,
-				avatar_url: user.avatar_url,
-			};
-		} catch (error) {
-			if (error instanceof DrizzleQueryError) {
-				if (error.cause instanceof postgres.PostgresError) {
-					if (error.cause.constraint_name === "users_email_unique") {
-						throw status(409, "User with this email already exists");
-					}
-				}
-			}
-			throw error;
-		}
-	}
 
-	async loginUser(email: string, password: string) {
-		const userRecords = await db
-			.select()
-			.from(users)
-			.where(eq(users.email, email));
+  async loginUser(email: string, password: string) {
+    const userRecords = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
 
-		if (userRecords.length === 0) {
-			throw status(404, "Not Found");
-		}
+    if (userRecords.length === 0) {
+      throw status(404, "Not Found");
+    }
 
-		const user = userRecords[0];
-		const isPasswordCorrect = await Bun.password.verify(
-			password,
-			user.password,
-		);
+    const user = userRecords[0];
+    const isPasswordCorrect = await Bun.password.verify(password, user.password);
 
-		if (!isPasswordCorrect) {
-			throw status(401, "Wrong password");
-		}
+    if (!isPasswordCorrect) {
+      throw status(401, "Wrong password");
+    }
 
-		return {
-			id: user.id,
-			email: user.email,
-			date_created: user.date_created,
-			full_name: user.full_name,
-			avatar_url: user.avatar_url,
-		};
-	}
+    return {
+      id: user.id,
+      email: user.email,
+      date_created: user.date_created,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+    };
+  }
 }
