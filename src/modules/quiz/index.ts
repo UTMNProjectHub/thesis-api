@@ -77,12 +77,10 @@ export const quiz = new Elysia({
 				Array.isArray(roles) &&
 				roles.some((role: { slug: string }) => role.slug === "teacher");
 
-			// Teachers with view flag can see questions directly
 			if (isTeacher && view === true) {
-				return await quizService.getQuestionsByQuizId(quizId);
+				return await quizService.getQuestionsWithVariantsByQuizId(quizId);
 			}
 
-			// Students need an active session header
 			if (activeSessionId) {
 				const session = await sessionService.getSession(activeSessionId);
 
@@ -92,6 +90,11 @@ export const quiz = new Elysia({
 
 				if (session.quizId !== quizId) {
 					throw status(403, "Session does not belong to this quiz");
+				}
+
+				// сессия завершена+вью = варианты
+				if (view === true && session.timeEnd !== null) {
+					return await quizService.getQuestionsWithVariantsByQuizId(quizId);
 				}
 
 				return await quizService.getQuestionsByQuizId(quizId);

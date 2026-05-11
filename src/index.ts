@@ -140,18 +140,12 @@ initializeAMQP()
 
 process.on("SIGTERM", async () => {
 	console.log("SIGTERM received, shutting down gracefully...");
-	await Promise.all([
-		app.stop(),
-		wsApp.stop(),
-	]);
+	await Promise.all([app.stop(), wsApp.stop()]);
 	process.exit(0);
 });
 
 process.on("SIGINT", async () => {
 	console.log("SIGINT received, shutting down gracefully...");
-	await Promise.all([
-		app.stop(),
-		wsApp.stop(),
-	]);
+	await Promise.all([app.stop(), wsApp.stop()]);
 	process.exit(0);
 });

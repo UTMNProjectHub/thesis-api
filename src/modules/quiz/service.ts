@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
 import {
@@ -101,6 +101,54 @@ export class QuizService {
 		return questionsQuery.map((qq) => qq.question);
 	}
 
+	async getQuestionsWithVariantsByQuizId(id: string) {
+		const questionsQuery = await db.query.quizesQuestions.findMany({
+			where: eq(quizesQuestions.quizId, id),
+			with: {
+				question: {
+					with: {
+						questionsVariants: {
+							with: { variant: true },
+						},
+					},
+				},
+			},
+		});
+
+		return questionsQuery.map((qq) => {
+			const { questionsVariants: qvs, ...question } =
+				qq.question as typeof qq.question & {
+					questionsVariants: Array<{
+						id: string;
+						questionId: string;
+						variantId: string | null;
+						isRight: boolean | null;
+						variant: {
+							id: string;
+							text: string;
+							leftMatching: string | null;
+							rightMatching: string | null;
+							explainRight: string;
+							explainWrong: string;
+						} | null;
+					}>;
+				};
+			const variants = (qvs ?? []).map((qv) => ({
+				id: qv.variant?.id ?? "",
+				text: qv.variant?.text ?? "",
+				leftMatching: qv.variant?.leftMatching ?? null,
+				rightMatching: qv.variant?.rightMatching ?? null,
+				explainRight: qv.variant?.explainRight ?? "",
+				explainWrong: qv.variant?.explainWrong ?? "",
+				isRight: qv.isRight ?? false,
+				questionId: qv.questionId,
+				variantId: qv.variantId ?? "",
+				questionsVariantsId: qv.id,
+			}));
+			return { ...question, variants };
+		});
+	}
+
 	async getQuizesByThemeId(themeId: number) {
 		const quizesList = await db.query.quizes.findMany({
 			where: eq(quizes.themeId, themeId),
@@ -121,7 +169,7 @@ export class QuizService {
 
 	async deleteQuiz(id: string) {
 		return await db.transaction(async (tx) => {
-			// session_submits don't cascade from quizSession, delete manually
+			// no cascade
 			const sessions = await tx.query.quizSession.findMany({
 				where: eq(quizSession.quizId, id),
 			});
@@ -133,11 +181,10 @@ export class QuizService {
 					.where(inArray(sessionSubmits.sessionId, sessionIds));
 			}
 
-			// usersQuizes and referencesQuiz don't have cascade, delete manually
+			// no cascade
 			await tx.delete(usersQuizes).where(eq(usersQuizes.quizId, id));
 			await tx.delete(referencesQuiz).where(eq(referencesQuiz.quizId, id));
 
-			// The rest cascade from quizes: chosenVariants, quizSession, quizesQuestions
 			return await tx.delete(quizes).where(eq(quizes.id, id));
 		});
 	}
