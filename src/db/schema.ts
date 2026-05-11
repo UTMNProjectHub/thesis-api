@@ -398,6 +398,7 @@ export const filesRelations = relations(files, ({ one, many }) => ({
 	referencesSubject: many(referencesSubject),
 	referencesTheme: many(referencesTheme),
 	faqs: many(faqs),
+	referencesFaq: many(referencesFaq),
 }));
 
 export const referencesQuestion = thesisSchema.table("references_question", {
@@ -564,7 +565,7 @@ export const faqs = thesisSchema.table("faqs", {
 	summaryId: integer().references(() => summaries.id),
 });
 
-export const faqsRelations = relations(faqs, ({ one }) => ({
+export const faqsRelations = relations(faqs, ({ one, many }) => ({
 	theme: one(themes, {
 		fields: [faqs.themeId],
 		references: [themes.id],
@@ -576,5 +577,25 @@ export const faqsRelations = relations(faqs, ({ one }) => ({
 	summary: one(summaries, {
 		fields: [faqs.summaryId],
 		references: [summaries.id],
+	}),
+	referencesFaq: many(referencesFaq),
+}));
+
+export const referencesFaq = thesisSchema.table("references_faq", {
+	id: integer().generatedByDefaultAsIdentity().primaryKey(),
+	faqId: uuid().references(() => faqs.id),
+	fileId: uuid()
+		.notNull()
+		.references(() => files.id),
+});
+
+export const referencesFaqRelations = relations(referencesFaq, ({ one }) => ({
+	faq: one(faqs, {
+		fields: [referencesFaq.faqId],
+		references: [faqs.id],
+	}),
+	file: one(files, {
+		fields: [referencesFaq.fileId],
+		references: [files.id],
 	}),
 }));
