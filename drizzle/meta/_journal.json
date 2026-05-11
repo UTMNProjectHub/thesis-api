@@ -99,6 +99,13 @@
       "when": 1778519171513,
       "tag": "0013_quick_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778519632359,
+      "tag": "0014_hot_black_bolt",
+      "breakpoints": true
     }
   ]
 }
