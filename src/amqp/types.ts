@@ -1,0 +1,15 @@
+export interface QuizGenCompleteMessage {
+	quizId: string; //uuid,
+	userId: string;
+	status: "SUCCESS" | "FAILED";
+	error?: string;
+}
+
+export interface SummaryGenCompleteMessage {
+	summaryId: string; // uuid
+	subjectId: number;
+	themeId: number;
+	userId: string; // uuid
+	status: "SUCCESS" | "FAILED";
+	error?: string;
+}

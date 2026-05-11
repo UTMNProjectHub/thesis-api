@@ -1,7 +1,7 @@
 import * as amqp from "amqplib";
 import { QUEUES } from "./queues";
 
-type MessageHandler = (message: unknown) => Promise<void> | void;
+type MessageHandler<T = unknown> = (message: T) => Promise<void> | void;
 
 class AMQPClient {
 	private static instance: AMQPClient | null = null;
@@ -111,9 +111,9 @@ class AMQPClient {
 		}
 	}
 
-	async consumeFromQueue(
+	async consumeFromQueue<T = unknown>(
 		queueName: string,
-		handler: MessageHandler,
+		handler: MessageHandler<T>,
 	): Promise<void> {
 		if (!this.channel) {
 			await this.connect();

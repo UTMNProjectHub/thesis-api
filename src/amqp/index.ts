@@ -1,48 +1,40 @@
+import { user } from "../modules/user";
 import { wsManager } from "../modules/websocket/manager";
 import { amqpClient } from "./client";
 import { QUEUES } from "./queues";
+import { QuizGenCompleteMessage, SummaryGenCompleteMessage } from "./types";
 
 export async function initializeAMQP() {
 	try {
 		await amqpClient.connect();
 
 		// Subscribe to quiz generation complete queue
-		await amqpClient.consumeFromQueue(
+		await amqpClient.consumeFromQueue<QuizGenCompleteMessage>(
 			QUEUES.QUIZ_GENERATION_COMPLETE,
 			async (message) => {
-				const { quizId, status, error } = message;
-				const topic = `quiz.${quizId}.generation`;
+				const { quizId, userId, status, error } = message;
+				const topic = `user.${userId}`;
 
 				console.log(
 					`📨 Received quiz generation complete for quizId: ${quizId}, status: ${status}, error: ${error}`,
 				);
 
-				wsManager.broadcast(topic, {
-					quizId,
-					status,
-					error,
-				});
+				wsManager.broadcast(topic, message);
 			},
 		);
 
 		// Subscribe to summary generation complete queue
-		await amqpClient.consumeFromQueue(
+		await amqpClient.consumeFromQueue<SummaryGenCompleteMessage>(
 			QUEUES.SUMMARY_GENERATION_COMPLETE,
 			async (message) => {
-				const { summaryId, subjectId, themeId, status, error } = message;
-				const topic = `summary.${summaryId}.generation`;
+				const { summaryId, userId, status, error } = message;
+				const topic = `user.${userId}`;
 
 				console.log(
 					`📨 Received summary generation complete for summaryId: ${summaryId}, status: ${status}, error: ${error}`,
 				);
 
-				wsManager.broadcast(topic, {
-					summaryId,
-					subjectId,
-					themeId,
-					status,
-					error,
-				});
+				wsManager.broadcast(topic, message);
 			},
 		);
 
