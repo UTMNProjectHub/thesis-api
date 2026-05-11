@@ -17,12 +17,13 @@ export const generation = new Elysia({
 	.model(GenerationModel)
 	.post(
 		"/quiz",
-		async ({ body, set }) => {
+		async ({ body, set, userId }) => {
 			const quizId = Bun.randomUUIDv7();
 
 			try {
 				await amqpClient.publishToQueue(QUEUES.QUIZ_GENERATION_REQUEST, {
 					...body,
+					userId: userId,
 					quizId: quizId,
 				});
 				return {
@@ -61,12 +62,13 @@ export const generation = new Elysia({
 	)
 	.post(
 		"/summary",
-		async ({ body, set }) => {
+		async ({ body, set, userId }) => {
 			try {
 				const summaryId = Bun.randomUUIDv7();
 
 				await amqpClient.publishToQueue(QUEUES.SUMMARY_GENERATION_REQUEST, {
 					...body,
+					userId: userId,
 					summaryId: summaryId,
 				});
 				return {
