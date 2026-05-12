@@ -122,6 +122,7 @@ export const quizes = thesisSchema.table("quizes", {
 	maxSessions: integer().notNull().default(1),
 	description: text().notNull(),
 	themeId: integer().references(() => themes.id),
+	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
 	createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -518,7 +519,7 @@ export const summaries = thesisSchema.table("summaries", {
 
 export const referencesSummary = thesisSchema.table("references_summary", {
 	id: integer().generatedByDefaultAsIdentity().primaryKey(),
-	summaryId: integer().references(() => summaries.id),
+	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
 	fileId: uuid()
 		.notNull()
 		.references(() => files.id, { onDelete: "cascade" }),
@@ -565,7 +566,7 @@ export const faqs = thesisSchema.table("faqs", {
 	fileId: uuid()
 		.references(() => files.id, { onDelete: "cascade" })
 		.notNull(),
-	summaryId: integer().references(() => summaries.id),
+	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
 });
 
 export const faqsRelations = relations(faqs, ({ one, many }) => ({
