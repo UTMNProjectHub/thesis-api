@@ -6,10 +6,19 @@ const plainSubject = createSelectSchema(subjects);
 const plainTheme = createSelectSchema(themes);
 const insertTheme = createInsertSchema(subjects);
 
+const updateSubjectBody = t.Object({
+	name: t.Optional(t.String()),
+	shortName: t.Optional(t.String()),
+	yearStart: t.Optional(t.Number()),
+	yearEnd: t.Optional(t.Number()),
+	description: t.Optional(t.Nullable(t.String())),
+});
+
 export const SubjectModel = new Elysia().model({
 	plainSubject: plainSubject,
 	multiplePlainSubjects: t.Array(plainSubject),
 	plainTheme: plainTheme,
 	multiplePlainThemes: t.Array(plainTheme),
 	insertSubject: insertTheme,
+	updateSubjectBody: updateSubjectBody,
 });

@@ -2,9 +2,15 @@ import { eq } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
 import { cache } from "../../db/redis";
-import { files, referencesTheme, themes } from "../../db/schema";
+import {
+	faqs,
+	files,
+	quizes,
+	referencesTheme,
+	summaries,
+	themes,
+} from "../../db/schema";
 import { FileService } from "../file/service";
-import { SubjectService } from "../subject/service";
 
 export class ThemeService {
 	private themeCacheTTL = 600;
@@ -73,6 +79,57 @@ export class ThemeService {
 		await cache.del(this.getSubjectThemesCacheKey(subjectId));
 
 		return inserted;
+	}
+
+	async updateTheme(
+		id: number,
+		data: { name?: string; description?: string | null },
+	) {
+		const theme = await db.query.themes.findFirst({
+			where: eq(themes.id, id),
+		});
+		if (!theme) {
+			throw status(404, "Not Found");
+		}
+
+		const updateData: Record<string, unknown> = {};
+		if (data.name !== undefined) updateData.name = data.name;
+		if (data.description !== undefined)
+			updateData.description = data.description;
+
+		const [updated] = await db
+			.update(themes)
+			.set(updateData)
+			.where(eq(themes.id, id))
+			.returning();
+
+		await cache.del(this.getThemeCacheKey(id));
+		await cache.del(this.getSubjectThemesCacheKey(theme.subjectId));
+
+		return updated;
+	}
+
+	async deleteTheme(id: number) {
+		const theme = await db.query.themes.findFirst({
+			where: eq(themes.id, id),
+		});
+		if (!theme) {
+			throw status(404, "Not Found");
+		}
+
+		await db.transaction(async (tx) => {
+			await tx.update(quizes).set({ themeId: null }).where(eq(quizes.themeId, id));
+			await tx
+				.update(summaries)
+				.set({ themeId: null })
+				.where(eq(summaries.themeId, id));
+			await tx.delete(faqs).where(eq(faqs.themeId, id));
+			await tx.delete(referencesTheme).where(eq(referencesTheme.themeId, id));
+			await tx.delete(themes).where(eq(themes.id, id));
+		});
+
+		await cache.del(this.getThemeCacheKey(id));
+		await cache.del(this.getSubjectThemesCacheKey(theme.subjectId));
 	}
 
 	async uploadFileToTheme(id: number, file: File, userId: string) {

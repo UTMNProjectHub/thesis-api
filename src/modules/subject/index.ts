@@ -62,6 +62,38 @@ export const subject = new Elysia({
 			},
 		},
 	)
+	.put(
+		"/:id",
+		({ params: { id }, subjectService, body }) => {
+			return subjectService.updateSubject(id, body);
+		},
+		{
+			isTeacher: true,
+			params: t.Object({
+				id: t.Number(),
+			}),
+			body: "updateSubjectBody",
+			response: {
+				200: "plainSubject",
+				404: t.String(),
+			},
+		},
+	)
+	.delete(
+		"/:id",
+		({ params: { id }, subjectService }) => {
+			return subjectService.deleteSubject(id);
+		},
+		{
+			isTeacher: true,
+			params: t.Object({
+				id: t.Number(),
+			}),
+			response: {
+				404: t.String(),
+			},
+		},
+	)
 	.get(
 		"/:id/themes",
 		({ params: { id }, subjectService, query }) => {

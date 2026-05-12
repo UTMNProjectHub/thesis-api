@@ -1,8 +1,17 @@
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
 import { cache } from "../../db/redis";
-import { files, referencesSubject, subjects, themes } from "../../db/schema";
+import {
+	faqs,
+	files,
+	quizes,
+	referencesSubject,
+	referencesTheme,
+	subjects,
+	summaries,
+	themes,
+} from "../../db/schema";
 import { FileService } from "../file/service";
 
 export class SubjectService {
@@ -149,6 +158,83 @@ export class SubjectService {
 		});
 
 		return fileData;
+	}
+
+	async updateSubject(
+		id: number,
+		data: {
+			name?: string;
+			shortName?: string;
+			yearStart?: number;
+			yearEnd?: number;
+			description?: string | null;
+		},
+	) {
+		const subject = await db.query.subjects.findFirst({
+			where: eq(subjects.id, id),
+		});
+		if (!subject) {
+			throw status(404, "Not Found");
+		}
+
+		const updateData: Record<string, unknown> = {};
+		if (data.name !== undefined) updateData.name = data.name;
+		if (data.shortName !== undefined) updateData.shortName = data.shortName;
+		if (data.yearStart !== undefined) updateData.yearStart = data.yearStart;
+		if (data.yearEnd !== undefined) updateData.yearEnd = data.yearEnd;
+		if (data.description !== undefined)
+			updateData.description = data.description;
+
+		const [updated] = await db
+			.update(subjects)
+			.set(updateData)
+			.where(eq(subjects.id, id))
+			.returning();
+
+		await this.invalidateSubjectCache(id);
+
+		return updated;
+	}
+
+	async deleteSubject(id: number) {
+		const subject = await db.query.subjects.findFirst({
+			where: eq(subjects.id, id),
+		});
+		if (!subject) {
+			throw status(404, "Not Found");
+		}
+
+		await db.transaction(async (tx) => {
+			const themeRows = await tx
+				.select({ id: themes.id })
+				.from(themes)
+				.where(eq(themes.subjectId, id));
+
+			if (themeRows.length > 0) {
+				const themeIds = themeRows.map((t) => t.id);
+				await tx
+					.update(quizes)
+					.set({ themeId: null })
+					.where(inArray(quizes.themeId, themeIds));
+				await tx
+					.update(summaries)
+					.set({ themeId: null })
+					.where(inArray(summaries.themeId, themeIds));
+				await tx.delete(faqs).where(inArray(faqs.themeId, themeIds));
+				await tx
+					.delete(referencesTheme)
+					.where(inArray(referencesTheme.themeId, themeIds));
+				await tx.delete(themes).where(eq(themes.subjectId, id));
+			}
+
+			await tx
+				.delete(referencesSubject)
+				.where(eq(referencesSubject.subjectId, id));
+			await tx.delete(subjects).where(eq(subjects.id, id));
+		});
+
+		await this.invalidateSubjectCache(id);
+		await this.invalidateAllSubjectsCache();
 	}
 
 	async invalidateSubjectCache(id: number) {
