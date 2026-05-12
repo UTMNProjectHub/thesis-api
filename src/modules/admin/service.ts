@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { users, subjects, themes, quizes, summaries, usersToRoles, files } from "../../db/schema";
+import { users, subjects, themes, quizes, summaries, usersToRoles, files, roles } from "../../db/schema";
 import { eq, count, and, sql, desc } from "drizzle-orm";
 import { status } from "elysia";
 
