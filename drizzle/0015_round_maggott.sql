@@ -1,0 +1,2 @@
+ALTER TABLE "thesis"."summaries" ADD COLUMN "name" varchar DEFAULT 'Автоконспект' NOT NULL;--> statement-breakpoint
+ALTER TABLE "thesis"."summaries" ADD COLUMN "createdAt" timestamp DEFAULT now() NOT NULL;

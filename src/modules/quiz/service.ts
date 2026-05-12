@@ -164,6 +164,7 @@ export class QuizService {
 			description: quiz.description,
 			themeId: quiz.themeId,
 			questionCount: quiz.quizesQuestions.length,
+			createdAt: quiz.createdAt,
 		}));
 	}
 
