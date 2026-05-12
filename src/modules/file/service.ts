@@ -2,8 +2,16 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { files } from "../../db/schema";
 import { client } from "../../s3";
+import { status } from "elysia";
+import { CacheService } from "../../db/redis";
 
 export class FileService {
+	private cacheService: CacheService;
+
+	constructor() {
+		this.cacheService = new CacheService();
+	}
+
 	async downloadFile(id: string) {
 		const fileQuery = await db
 			.select({
@@ -43,5 +51,18 @@ export class FileService {
 		}
 
 		return fileData;
+	}
+
+	async deleteFile(id: string) {
+		const fileQuery = await db.query.files.findFirst({
+			where: eq(files.id, id),
+		});
+
+		if (!fileQuery) {
+			throw status(404, "Not Found");
+		}
+
+		await client.file(fileQuery.s3Index).delete();
+		await db.delete(files).where(eq(files.id, id));
 	}
 }

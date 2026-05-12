@@ -3,8 +3,15 @@ import { status } from "elysia";
 import { db } from "../../db";
 import { summaries } from "../../db/schema";
 import { client as S3Client } from "../../s3";
+import { FileService } from "../file/service";
 
 export class SummaryService {
+	private fileService: FileService;
+
+	constructor() {
+		this.fileService = new FileService();
+	}
+
 	async getSummariesByThemeId(themeId: number) {
 		const summariesQuery = await db
 			.select()
@@ -49,9 +56,7 @@ export class SummaryService {
 			throw status(404, "Not Found");
 		}
 
-		const filePath = summaryQuery.file.s3Index;
-
 		await db.delete(summaries).where(eq(summaries.id, summaryId));
-		await S3Client.delete(filePath);
+		await this.fileService.deleteFile(summaryQuery.file.id);
 	}
 }

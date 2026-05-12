@@ -359,7 +359,7 @@ export const referencesQuiz = thesisSchema.table("references_quiz", {
 		}),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 	userId: uuid()
 		.notNull()
 		.references(() => users.id),
@@ -411,7 +411,7 @@ export const referencesQuestion = thesisSchema.table("references_question", {
 		.references(() => questions.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 });
 
 export const referencesQuestionRelations = relations(
@@ -445,7 +445,7 @@ export const subjectsRelations = relations(subjects, ({ many }) => ({
 export const referencesSubject = thesisSchema.table("references_subject", {
 	id: integer().generatedByDefaultAsIdentity().primaryKey(),
 	subjectId: integer().references(() => subjects.id),
-	fileId: uuid().references(() => files.id),
+	fileId: uuid().references(() => files.id, { onDelete: "cascade" }),
 });
 
 export const referencesSubjectRelations = relations(
@@ -488,7 +488,7 @@ export const referencesTheme = thesisSchema.table("references_theme", {
 		.references(() => themes.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 });
 
 export const referencesThemeRelations = relations(
@@ -512,7 +512,7 @@ export const summaries = thesisSchema.table("summaries", {
 	themeId: integer().references(() => themes.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 	createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -521,7 +521,7 @@ export const referencesSummary = thesisSchema.table("references_summary", {
 	summaryId: integer().references(() => summaries.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 });
 
 export const referencesSummaryRelations = relations(
@@ -563,7 +563,7 @@ export const faqs = thesisSchema.table("faqs", {
 	difficultyLevel: varchar().notNull(),
 	num_questions: integer().notNull(),
 	fileId: uuid()
-		.references(() => files.id)
+		.references(() => files.id, { onDelete: "cascade" })
 		.notNull(),
 	summaryId: integer().references(() => summaries.id),
 });
@@ -589,7 +589,7 @@ export const referencesFaq = thesisSchema.table("references_faq", {
 	faqId: uuid().references(() => faqs.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id),
+		.references(() => files.id, { onDelete: "cascade" }),
 });
 
 export const referencesFaqRelations = relations(referencesFaq, ({ one }) => ({

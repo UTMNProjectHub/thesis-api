@@ -28,10 +28,6 @@ export class SubjectService {
 		return q ? `subject:${id}:themes:${q}` : `subject:${id}:themes`;
 	}
 
-	protected getSubjectFilesCacheKey(id: number): string {
-		return `subject:${id}:files`;
-	}
-
 	async getAllSubjects(q?: string) {
 		const cacheKey = this.getSubjectsCacheKey(q);
 
@@ -123,26 +119,18 @@ export class SubjectService {
 	}
 
 	async getSubjectFiles(id: number) {
-		const cacheKey = this.getSubjectFilesCacheKey(id);
+		const subjectFiles = await db
+			.select({
+				id: files.id,
+				name: files.name,
+				s3Index: files.s3Index,
+				userId: files.userId,
+			})
+			.from(files)
+			.innerJoin(referencesSubject, eq(files.id, referencesSubject.fileId))
+			.where(eq(referencesSubject.subjectId, id));
 
-		return await cache.getOrSet(
-			cacheKey,
-			async () => {
-				const subjectFiles = await db
-					.select({
-						id: files.id,
-						name: files.name,
-						s3Index: files.s3Index,
-						userId: files.userId,
-					})
-					.from(files)
-					.innerJoin(referencesSubject, eq(files.id, referencesSubject.fileId))
-					.where(eq(referencesSubject.subjectId, id));
-
-				return subjectFiles;
-			},
-			this.filesCacheTTL,
-		);
+		return subjectFiles;
 	}
 
 	async uploadFileToSubject(id: number, file: File, userId: string) {
@@ -157,12 +145,8 @@ export class SubjectService {
 				subjectId: id,
 				fileId: fileData.id,
 			});
-			return [
-				fileData,
-			];
+			return [fileData];
 		});
-
-		cache.del(this.getSubjectFilesCacheKey(id));
 
 		return fileData;
 	}
@@ -170,7 +154,6 @@ export class SubjectService {
 	async invalidateSubjectCache(id: number) {
 		await cache.del(this.getSubjectCacheKey(id));
 		await cache.del(this.getSubjectThemesCacheKey(id));
-		await cache.del(this.getSubjectFilesCacheKey(id));
 		await cache.del(this.getSubjectsCacheKey());
 	}
 
