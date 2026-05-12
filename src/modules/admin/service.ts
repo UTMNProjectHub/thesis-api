@@ -58,7 +58,7 @@ export class AdminService {
     // Если у таблиц нет полей даты, просто оставляем пустой массив
     // Можно также проверить наличие колонок через схему, но для простоты:
     activityByDay = []; // пока пусто, потому что полей даты нет
-    console.log("Detailed stats:", { activityByDay, contentDistribution, userGrowth });
+    
     return {
       activityByDay,
       contentDistribution,
