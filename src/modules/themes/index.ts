@@ -1,4 +1,5 @@
 import Elysia, { t } from "elysia";
+import { FaqService } from "../faq/service";
 import { QuizService } from "../quiz/service";
 import { roleMacro } from "../roles/macro";
 import { SummaryService } from "../summary/service";
@@ -13,6 +14,7 @@ export const theme = new Elysia({
 	.decorate("themeService", new ThemeService())
 	.decorate("quizService", new QuizService())
 	.decorate("summaryService", new SummaryService())
+	.decorate("faqService", new FaqService())
 	.put(
 		"/:id",
 		({ params: { id }, themeService, body }) => {
@@ -101,6 +103,18 @@ export const theme = new Elysia({
 		"/:id/summaries",
 		({ params: { id }, summaryService }) => {
 			return summaryService.getSummariesByThemeId(id);
+		},
+		{
+			isTeacher: true,
+			params: t.Object({
+				id: t.Number(),
+			}),
+		},
+	)
+	.get(
+		"/:id/faqs",
+		({ params: { id }, faqService }) => {
+			return faqService.getFaqsByThemeId(id);
 		},
 		{
 			isTeacher: true,

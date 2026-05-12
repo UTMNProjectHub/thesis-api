@@ -64,9 +64,22 @@ export const SummaryGenComplete = t.Object({
 	error: t.Optional(t.String()),
 });
 
+export const FaqGenBody = t.Object({
+	summaryId: t.Number(),
+	title: t.String(),
+	numQuestions: t.Number({ minimum: 1 }),
+	detailLevel: t.Union([
+		t.Literal("easy"),
+		t.Literal("medium"),
+		t.Literal("hard"),
+	]),
+	additionalRequirements: t.Optional(t.String()),
+});
+
 export const GenerationModel = {
 	quizGenBody: QuizGenBody,
 	summaryGenBody: SummaryGenBody,
 	quizGenComplete: QuizGenComplete,
 	summaryGenComplete: SummaryGenComplete,
+	faqGenBody: FaqGenBody,
 };

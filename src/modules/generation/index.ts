@@ -104,4 +104,49 @@ export const generation = new Elysia({
 				}),
 			},
 		},
+	)
+	.post(
+		"/faq",
+		async ({ body, set, userId }) => {
+			const faqId = Bun.randomUUIDv7();
+
+			try {
+				await amqpClient.publishToQueue(QUEUES.FAQ_GENERATION_REQUEST, {
+					...body,
+					userId: userId,
+					faqId: faqId,
+				});
+				return {
+					success: true,
+					message: "FAQ generation request sent",
+					faqId: faqId,
+				};
+			} catch (error) {
+				console.error("Error publishing FAQ generation request:", error);
+				set.status = 500;
+				return {
+					success: false,
+					message: "Failed to send FAQ generation request",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		},
+		{
+			isAuth: true,
+			body: "faqGenBody",
+			response: {
+				200: t.Object({
+					success: t.Boolean(),
+					message: t.String(),
+					faqId: t.String({
+						format: "uuid",
+					}),
+				}),
+				500: t.Object({
+					success: t.Boolean(),
+					message: t.String(),
+					error: t.String(),
+				}),
+			},
+		},
 	);

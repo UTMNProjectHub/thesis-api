@@ -13,3 +13,10 @@ export interface SummaryGenCompleteMessage {
 	status: "SUCCESS" | "FAILED";
 	error?: string;
 }
+
+export interface FaqGenCompleteMessage {
+	faqId: string; // uuid
+	userId: string; // uuid
+	status: "SUCCESS" | "FAILED";
+	error?: string;
+}

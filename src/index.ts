@@ -46,6 +46,7 @@ import { theme } from "./modules/themes";
 import { websocket } from "./modules/websocket";
 import { summaries } from "./db/schema";
 import { summary } from "./modules/summary";
+import { faq } from "./modules/faq";
 
 // HTTP API app
 const app = new Elysia({
@@ -92,6 +93,7 @@ app.use(question);
 app.use(generation);
 app.use(quizSession);
 app.use(summary);
+app.use(faq);
 
 // WebSocket server setup
 wsApp.use(websocket);
