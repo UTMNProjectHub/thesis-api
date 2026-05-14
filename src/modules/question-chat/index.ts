@@ -11,6 +11,21 @@ export const questionChatModule = new Elysia({
 })
 	.use(authMacro)
 	.decorate("QuestionChatService", new QuestionChatService())
+	.get(
+		"/",
+		async ({
+			query: { questionId, sessionId },
+			QuestionChatService,
+			userId,
+		}) => QuestionChatService.getMessages(questionId, userId, sessionId),
+		{
+			query: t.Object({
+				questionId: t.String({ format: "uuid" }),
+				sessionId: t.String({ format: "uuid" }),
+			}),
+			isAuth: true,
+		},
+	)
 	.post(
 		"/",
 		async ({

@@ -16,6 +16,32 @@ import { QUEUES } from "../../amqp/queues";
 import { QuizAnswerDialogMessage } from "../../amqp/types";
 
 export class QuestionChatService {
+	async getMessages(
+		questionId: string,
+		userId: string,
+		sessionId: string,
+	) {
+		const submission = await db.query.questionSubmissions.findFirst({
+			where: and(
+				eq(questionSubmissions.questionId, questionId),
+				eq(questionSubmissions.sessionId, sessionId),
+			),
+			with: { quizAnswerDialog: true },
+		});
+
+		if (!submission) return { dialogId: null, messages: [] };
+		const dialog = submission.quizAnswerDialog;
+		if (!dialog) return { dialogId: null, messages: [] };
+		if (dialog.userId !== userId) throw status(403, "Forbidden");
+
+		const messages = await db.query.quizAnswerDialogMessages.findMany({
+			where: eq(quizAnswerDialogMessages.dialogId, dialog.id),
+			orderBy: (m, { asc }) => [asc(m.sequenceNo)],
+		});
+
+		return { dialogId: dialog.id, messages };
+	}
+
 	async submitMessage(
 		questionId: string,
 		userId: string,
