@@ -153,12 +153,8 @@ export class QuestionService {
 		);
 		const selectedSet = new Set(variantIds);
 		const overallIsRight =
-			[
-				...selectedSet,
-			].every((id) => correctVariantIds.has(id)) &&
-			[
-				...correctVariantIds,
-			].every((id) => selectedSet.has(id));
+			[...selectedSet].every((id) => correctVariantIds.has(id)) &&
+			[...correctVariantIds].every((id) => selectedSet.has(id));
 
 		const chosenVariantsArr = variantIds.map((variantId) => {
 			const questionVariant = variantsQuery.find((v) => v.id === variantId);
@@ -226,6 +222,21 @@ export class QuestionService {
 		};
 	}
 
+	async getQuestionWithQuizPivot(questionId: string) {
+		const questionQuery = await db.query.questions.findFirst({
+			where: eq(questions.id, questionId),
+			with: {
+				quizesQuestions: true,
+			},
+		});
+
+		if (!questionQuery) {
+			throw status(404, "Not Found");
+		}
+
+		return questionQuery;
+	}
+
 	async submitQuestionText(
 		userId: string,
 		quizId: string,
@@ -239,11 +250,7 @@ export class QuestionService {
 			quizId,
 		);
 
-		const textQuestionTypes = [
-			"shortanswer",
-			"essay",
-			"numerical",
-		];
+		const textQuestionTypes = ["shortanswer", "essay", "numerical"];
 		if (!textQuestionTypes.includes(questionQuery.type)) {
 			throw status(
 				400,
@@ -298,9 +305,7 @@ export class QuestionService {
 			await this.sessionService.addSubmitsToSessionInTransaction(
 				tx,
 				session.id,
-				[
-					inserted.id,
-				],
+				[inserted.id],
 			);
 
 			await this.sessionService.recordQuestionSubmissionInTransaction(
@@ -310,9 +315,7 @@ export class QuestionService {
 				isRight,
 			);
 
-			return [
-				inserted,
-			];
+			return [inserted];
 		});
 
 		return {

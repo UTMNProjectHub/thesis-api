@@ -20,3 +20,16 @@ export interface FaqGenCompleteMessage {
 	status: "SUCCESS" | "FAILED";
 	error?: string;
 }
+
+export interface QuizAnswerDialogMessage {
+	dialogId: string; // uuid
+	userId: string; // uuid
+	messageId: string; // uuid
+}
+
+export interface QuizAnswerDialogCompleteMessage {
+	status: "SUCCESS" | "FAILED";
+	dialogId: string; // uuid
+	userId: string; // uuid
+	error?: string;
+}

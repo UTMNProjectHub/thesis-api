@@ -2,7 +2,12 @@ import { user } from "../modules/user";
 import { wsManager } from "../modules/websocket/manager";
 import { amqpClient } from "./client";
 import { QUEUES } from "./queues";
-import { FaqGenCompleteMessage, QuizGenCompleteMessage, SummaryGenCompleteMessage } from "./types";
+import {
+	FaqGenCompleteMessage,
+	QuizAnswerDialogCompleteMessage,
+	QuizGenCompleteMessage,
+	SummaryGenCompleteMessage,
+} from "./types";
 
 export async function initializeAMQP() {
 	try {
@@ -47,6 +52,20 @@ export async function initializeAMQP() {
 
 				console.log(
 					`📨 Received FAQ generation complete for faqId: ${faqId}, status: ${status}, error: ${error}`,
+				);
+
+				wsManager.broadcast(topic, message);
+			},
+		);
+
+		await amqpClient.consumeFromQueue<QuizAnswerDialogCompleteMessage>(
+			QUEUES.QUIZ_ANSWER_DIALOG_RESPONSE,
+			async (message) => {
+				const { dialogId, userId, status, error } = message;
+				const topic = `user.${userId}`;
+
+				console.log(
+					`📨 Received FAQ generation complete for QuizDialog: ${dialogId}, status: ${status}, error: ${error}`,
 				);
 
 				wsManager.broadcast(topic, message);

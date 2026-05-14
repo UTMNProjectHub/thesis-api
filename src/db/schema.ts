@@ -156,6 +156,7 @@ export const questionsRelations = relations(questions, ({ many }) => ({
 	questionsVariants: many(questionsVariants),
 	referencesQuestion: many(referencesQuestion),
 	chosenVariants: many(chosenVariants),
+	questionSubmissions: many(questionSubmissions),
 }));
 
 export const quizesQuestions = thesisSchema.table("quizes_questions", {
@@ -264,7 +265,7 @@ export const quizAnswerDialogs = thesisSchema.table(
 				onDelete: "cascade",
 				onUpdate: "cascade",
 			}),
-		contextSnapshot: jsonb().notNull(),
+		contextSnapshot: jsonb(),
 		createdAt: timestamp().notNull().defaultNow(),
 		updatedAt: timestamp().notNull().defaultNow(),
 	},
@@ -409,6 +410,24 @@ export const questionSubmissions = thesisSchema.table(
 		sessionQuestionUnique: unique(
 			"question_submissions_session_question_unique",
 		).on(t.sessionId, t.questionId),
+	}),
+);
+
+export const questionSubmissionsRelations = relations(
+	questionSubmissions,
+	({ one }) => ({
+		session: one(quizSession, {
+			fields: [questionSubmissions.sessionId],
+			references: [quizSession.id],
+		}),
+		question: one(questions, {
+			fields: [questionSubmissions.questionId],
+			references: [questions.id],
+		}),
+		quizAnswerDialog: one(quizAnswerDialogs, {
+			fields: [questionSubmissions.id],
+			references: [quizAnswerDialogs.questionSubmissionId],
+		}),
 	}),
 );
 
