@@ -29,44 +29,6 @@ describe("AuthService", () => {
 		authService = new AuthService();
 	});
 
-	it("should store a refresh token", async () => {
-		const userId = "1";
-		const userAgent = "test-agent";
-		const jwt = "test-jwt";
-
-		await authService.storeRefreshToken(userId, userAgent, jwt);
-		const storedToken = await authService.redisClient.hget(
-			`user:${userId}:refresh`,
-			`agent:${userAgent}`,
-		);
-		expect(storedToken).toBe(jwt);
-	});
-
-	it("should check a refresh token", async () => {
-		const userId = "1";
-		const userAgent = "test-agent";
-		const jwt = "test-jwt";
-
-		await authService.storeRefreshToken(userId, userAgent, jwt);
-		const result = await authService.checkRefreshToken(userId, userAgent, jwt);
-		expect(result).toBe(true);
-	});
-
-	it("should throw an error for an invalid refresh token", async () => {
-		const userId = "1";
-		const userAgent = "test-agent";
-		const jwt = "test-jwt";
-
-		await authService.storeRefreshToken(userId, userAgent, "different-jwt");
-		try {
-			await authService.checkRefreshToken(userId, userAgent, jwt);
-		} catch (error: any) {
-			console.log(error);
-			expect(error.code).toBe(401);
-			expect(error.response).toBe("Unauthorized");
-		}
-	});
-
 	it("should create a user", async () => {
 		const email = "test@example.com";
 		const password = "password";

@@ -1,5 +1,27 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { UserService } from "../service";
+
+const mockCacheGet = mock();
+const mockCacheSet = mock();
+const mockCacheDel = mock();
+
+mock.module("../../../db/redis", () => ({
+	cache: {
+		get: mockCacheGet,
+		set: mockCacheSet,
+		del: mockCacheDel,
+	},
+}));
+
+mock.module("ioredis", () => ({
+	default: class {
+		on = mock();
+		get = mock();
+		set = mock();
+		setex = mock();
+		del = mock();
+		quit = mock();
+	},
+}));
 
 const mockDb = {
 	query: {
@@ -8,14 +30,17 @@ const mockDb = {
 		},
 	},
 	update: mock(),
-	set: mock(),
-	where: mock(),
-	returning: mock(),
 };
 
 mock.module("../../../db", () => ({
 	db: mockDb,
 }));
+
+mock.module("drizzle-orm", () => ({
+	eq: mock((...args: unknown[]) => ({ eq: args })),
+}));
+
+import { UserService } from "../service";
 
 describe("UserService", () => {
 	let userService: UserService;
@@ -24,195 +49,220 @@ describe("UserService", () => {
 		userService = new UserService();
 		mockDb.query.users.findFirst.mockReset();
 		mockDb.update.mockReset();
-		mockDb.set.mockReset();
-		mockDb.where.mockReset();
-		mockDb.returning.mockReset();
+		mockCacheGet.mockReset();
+		mockCacheSet.mockReset();
+		mockCacheDel.mockReset();
 	});
 
-	it("should get user by id with roles", async () => {
-		const userId = "test-user-id";
-		const mockUser = {
-			id: userId,
-			email: "test@example.com",
-			date_created: new Date(),
-			full_name: "Test User",
-			avatar_url: null,
-			usersToRoles: [
-				{
-					role: {
+	// ── getUserById ──────────────────────────────────────────────────────────────
+
+	describe("getUserById", () => {
+		it("should return cached user on cache hit", async () => {
+			const cachedUser = {
+				id: "test-user-id",
+				email: "test@example.com",
+				date_created: new Date(),
+				full_name: "Test User",
+				avatar_url: null,
+				roles: [],
+			};
+			mockCacheGet.mockResolvedValue(cachedUser);
+
+			const result = await userService.getUserById("test-user-id");
+
+			expect(result).toEqual(cachedUser);
+			expect(mockDb.query.users.findFirst).not.toHaveBeenCalled();
+		});
+
+		it("should query db and cache result on cache miss", async () => {
+			const userId = "test-user-id";
+			const roleDate = new Date();
+			const mockUser = {
+				id: userId,
+				email: "test@example.com",
+				date_created: new Date(),
+				full_name: "Test User",
+				avatar_url: null,
+				usersToRoles: [
+					{
+						role: {
+							id: 1,
+							title: "Admin",
+							slug: "admin",
+							description: "Administrator role",
+							date_created: roleDate,
+						},
+					},
+				],
+			};
+
+			mockCacheGet.mockResolvedValue(null);
+			mockDb.query.users.findFirst.mockReturnValue(mockUser);
+			mockCacheSet.mockResolvedValue(undefined);
+
+			const result = await userService.getUserById(userId);
+
+			expect(result).toEqual({
+				id: userId,
+				email: "test@example.com",
+				date_created: mockUser.date_created,
+				full_name: "Test User",
+				avatar_url: null,
+				roles: [
+					{
 						id: 1,
 						title: "Admin",
 						slug: "admin",
 						description: "Administrator role",
-						date_created: new Date(),
+						date_created: roleDate,
 					},
-				},
-			],
-		};
+				],
+			});
+			expect(mockCacheSet).toHaveBeenCalledWith(
+				`user:${userId}:profile`,
+				expect.any(Object),
+				300,
+			);
+		});
 
-		mockDb.query.users.findFirst.mockReturnValue(mockUser);
+		it("should throw 404 when user not found", async () => {
+			mockCacheGet.mockResolvedValue(null);
+			mockDb.query.users.findFirst.mockReturnValue(null);
 
-		const result = await userService.getUserById(userId);
-
-		expect(result).toEqual({
-			id: userId,
-			email: "test@example.com",
-			date_created: mockUser.date_created,
-			full_name: "Test User",
-			avatar_url: null,
-			roles: [
-				{
-					id: 1,
-					title: "Admin",
-					slug: "admin",
-					description: "Administrator role",
-					date_created: mockUser.usersToRoles[0].role.date_created,
-				},
-			],
+			try {
+				await userService.getUserById("non-existent");
+				expect(true).toBe(false);
+			} catch (error: any) {
+				expect(error.code).toBe(404);
+				expect(error.response).toBe("Not Found");
+			}
 		});
 	});
 
-	it("should throw 404 when user not found", async () => {
-		const userId = "non-existent-user";
+	// ── editUserById ─────────────────────────────────────────────────────────────
 
-		mockDb.query.users.findFirst.mockReturnValue(null);
-
-		try {
-			await userService.getUserById(userId);
-		} catch (error: any) {
-			expect(error.code).toBe(404);
-			expect(error.response).toBe("Not Found");
-		}
-	});
-
-	it("should edit user by id successfully", async () => {
-		const userId = "test-user-id";
-		const newEmail = "newemail@example.com";
-		const newFullName = "New Full Name";
-
-		const mockUser = {
-			id: userId,
-			email: "old@example.com",
-			full_name: "Old Name",
-			date_created: new Date(),
-			avatar_url: null,
-			password: "hashed-password",
-		};
-
-		const mockUpdatedUser = {
-			id: userId,
-			email: newEmail,
-			full_name: newFullName,
-			date_created: mockUser.date_created,
-			avatar_url: null,
-			password: "hashed-password",
-		};
-
-		mockDb.query.users.findFirst.mockReturnValue(mockUser);
-
-		const mockUpdateChain = {
+	describe("editUserById", () => {
+		const makeUpdateChain = (returnedRows: any[]) => ({
 			set: mock().mockReturnValue({
 				where: mock().mockReturnValue({
-					returning: mock().mockReturnValue([
-						mockUpdatedUser,
-					]),
+					returning: mock().mockReturnValue(returnedRows),
 				}),
 			}),
-		};
-		mockDb.update.mockReturnValue(mockUpdateChain);
+		});
 
-		const result = await userService.editUserById(
-			userId,
-			newEmail,
-			newFullName,
-		);
+		it("should update and return user with full fields", async () => {
+			const updated = {
+				id: "test-user-id",
+				email: "new@example.com",
+				full_name: "New Name",
+				date_created: new Date(),
+				avatar_url: null,
+				password: "hashed",
+			};
+			mockDb.update.mockReturnValue(makeUpdateChain([updated]));
+			mockCacheDel.mockResolvedValue(undefined);
 
-		expect(result).toEqual(mockUpdatedUser);
+			const result = await userService.editUserById(
+				"test-user-id",
+				"new@example.com",
+				"New Name",
+			);
+
+			expect(result).toEqual(updated);
+			expect(mockCacheDel).toHaveBeenCalledWith("user:test-user-id:profile");
+		});
+
+		it("should update with partial fields (email only)", async () => {
+			const updated = {
+				id: "test-user-id",
+				email: "new@example.com",
+				full_name: "Old Name",
+				date_created: new Date(),
+				avatar_url: null,
+				password: "hashed",
+			};
+			mockDb.update.mockReturnValue(makeUpdateChain([updated]));
+			mockCacheDel.mockResolvedValue(undefined);
+
+			const result = await userService.editUserById("test-user-id", "new@example.com");
+
+			expect(result).toEqual(updated);
+		});
+
+		it("should throw 404 when no rows returned (user not found)", async () => {
+			mockDb.update.mockReturnValue(makeUpdateChain([]));
+
+			try {
+				await userService.editUserById("non-existent", "x@x.com");
+				expect(true).toBe(false);
+			} catch (error: any) {
+				expect(error.code).toBe(404);
+				expect(error.response).toBe("Not Found");
+			}
+		});
 	});
 
-	it("should edit user by id with partial update", async () => {
-		const userId = "test-user-id";
-		const newEmail = "newemail@example.com";
+	// ── getUserRoles ─────────────────────────────────────────────────────────────
 
-		const mockUser = {
-			id: userId,
-			email: "old@example.com",
-			full_name: "Old Name",
-			date_created: new Date(),
-			avatar_url: null,
-			password: "hashed-password",
-		};
+	describe("getUserRoles", () => {
+		it("should return cached roles on cache hit", async () => {
+			const cachedRoles = [{ id: 1, title: "Admin", slug: "admin" }];
+			mockCacheGet.mockResolvedValue(cachedRoles);
 
-		const mockUpdatedUser = {
-			id: userId,
-			email: newEmail,
-			full_name: "Old Name",
-			date_created: mockUser.date_created,
-			avatar_url: null,
-			password: "hashed-password",
-		};
+			const result = await userService.getUserRoles("test-user-id");
 
-		mockDb.query.users.findFirst.mockReturnValue(mockUser);
+			expect(result).toEqual(cachedRoles);
+			expect(mockDb.query.users.findFirst).not.toHaveBeenCalled();
+		});
 
-		const mockUpdateChain = {
-			set: mock().mockReturnValue({
-				where: mock().mockReturnValue({
-					returning: mock().mockReturnValue([
-						mockUpdatedUser,
-					]),
-				}),
-			}),
-		};
-		mockDb.update.mockReturnValue(mockUpdateChain);
+		it("should query db and cache roles on cache miss", async () => {
+			const userId = "test-user-id";
+			const role = { id: 1, title: "Admin", slug: "admin", description: null, date_created: null };
+			const mockUser = {
+				id: userId,
+				usersToRoles: [{ role }],
+			};
 
-		const result = await userService.editUserById(userId, newEmail);
+			mockCacheGet.mockResolvedValue(null);
+			mockDb.query.users.findFirst.mockReturnValue(mockUser);
+			mockCacheSet.mockResolvedValue(undefined);
 
-		expect(result).toEqual(mockUpdatedUser);
+			const result = await userService.getUserRoles(userId);
+
+			expect(result).toEqual([role]);
+			expect(mockCacheSet).toHaveBeenCalledWith(
+				`user:${userId}:roles`,
+				[role],
+				600,
+			);
+		});
+
+		it("should throw 404 when user not found", async () => {
+			mockCacheGet.mockResolvedValue(null);
+			mockDb.query.users.findFirst.mockReturnValue(null);
+
+			try {
+				await userService.getUserRoles("non-existent");
+				expect(true).toBe(false);
+			} catch (error: any) {
+				expect(error.code).toBe(404);
+				expect(error.response).toBe("Not Found");
+			}
+		});
 	});
 
-	it("should throw 404 when editing non-existent user", async () => {
-		const userId = "non-existent-user";
-		const newEmail = "newemail@example.com";
+	// ── invalidateUserCache ──────────────────────────────────────────────────────
 
-		mockDb.query.users.findFirst.mockReturnValue(null);
+	describe("invalidateUserCache", () => {
+		it("should delete both profile and roles cache keys", async () => {
+			const userId = "test-user-id";
+			mockCacheDel.mockResolvedValue(undefined);
 
-		try {
-			await userService.editUserById(userId, newEmail);
-		} catch (error: any) {
-			expect(error.code).toBe(404);
-			expect(error.response).toBe("Not Found");
-		}
-	});
+			await userService.invalidateUserCache(userId);
 
-	it("should throw 500 when update fails", async () => {
-		const userId = "test-user-id";
-		const newEmail = "newemail@example.com";
-
-		const mockUser = {
-			id: userId,
-			email: "old@example.com",
-			full_name: "Old Name",
-			date_created: new Date(),
-			avatar_url: null,
-			password: "hashed-password",
-		};
-
-		mockDb.query.users.findFirst.mockReturnValue(mockUser);
-
-		const mockUpdateChain = {
-			set: mock().mockReturnValue({
-				where: mock().mockReturnValue({
-					returning: mock().mockReturnValue([]),
-				}),
-			}),
-		};
-		mockDb.update.mockReturnValue(mockUpdateChain);
-
-		try {
-			await userService.editUserById(userId, newEmail);
-		} catch (error: any) {
-			expect(error.code).toBe(500);
-			expect(error.response).toBe("Internal Server Error");
-		}
+			expect(mockCacheDel).toHaveBeenCalledWith(`user:${userId}:profile`);
+			expect(mockCacheDel).toHaveBeenCalledWith(`user:${userId}:roles`);
+			expect(mockCacheDel).toHaveBeenCalledTimes(2);
+		});
 	});
 });
