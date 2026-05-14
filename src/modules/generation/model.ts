@@ -25,7 +25,7 @@ export const QuizGenBody = t.Object({
 			t.Literal("numerical"),
 		]),
 	),
-	summaryId: t.Optional(t.String({ format: 'uuid' })),
+	summaryId: t.Optional(t.String({ format: "uuid" })),
 	additional_requirements: t.Optional(t.String()),
 });
 
@@ -44,10 +44,7 @@ export const QuizGenComplete = t.Object({
 	quizId: t.String({
 		format: "uuid",
 	}),
-	status: t.Union([
-		t.Literal("SUCCESS"),
-		t.Literal("FAILED"),
-	]),
+	status: t.Union([t.Literal("SUCCESS"), t.Literal("FAILED")]),
 	error: t.Optional(t.String()),
 });
 
@@ -57,10 +54,7 @@ export const SummaryGenComplete = t.Object({
 	}),
 	subjectId: t.Number(),
 	themeId: t.Number(),
-	status: t.Union([
-		t.Literal("SUCCESS"),
-		t.Literal("FAILED"),
-	]),
+	status: t.Union([t.Literal("SUCCESS"), t.Literal("FAILED")]),
 	error: t.Optional(t.String()),
 });
 
@@ -74,6 +68,7 @@ export const FaqGenBody = t.Object({
 		t.Literal("hard"),
 	]),
 	additionalRequirements: t.Optional(t.String()),
+	themeId: t.Number(),
 });
 
 export const GenerationModel = {
