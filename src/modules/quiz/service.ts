@@ -3,6 +3,8 @@ import { status } from "elysia";
 import { db } from "../../db";
 import {
 	chosenVariants,
+	questions,
+	questionSubmissions,
 	quizes,
 	quizesQuestions,
 	quizSession,
@@ -204,13 +206,14 @@ export class QuizService {
 				sessionId: quizSession.id,
 				timeStart: quizSession.timeStart,
 				timeEnd: quizSession.timeEnd,
-				submitId: sessionSubmits.id,
-				isRight: chosenVariants.isRight,
+				isRight: questionSubmissions.isRight,
 			})
 			.from(users)
 			.innerJoin(quizSession, eq(users.id, quizSession.userId))
-			.leftJoin(sessionSubmits, eq(sessionSubmits.sessionId, quizSession.id))
-			.leftJoin(chosenVariants, eq(sessionSubmits.submitId, chosenVariants.id))
+			.leftJoin(
+				questionSubmissions,
+				eq(quizSession.id, questionSubmissions.sessionId),
+			)
 			.where(eq(quizSession.quizId, quizId));
 
 		const sessionsMap = new Map<
@@ -241,14 +244,19 @@ export class QuizService {
 					rightAnswers: 0,
 				});
 			}
-			// biome-ignore lint/style/noNonNullAssertion: key was just set above
-			const session = sessionsMap.get(key)!;
-			if (row.submitId) {
-				session.totalSubmits++;
-				if (row.isRight === true) {
-					session.rightAnswers++;
-				}
+
+			console.log(row);
+
+			const session = sessionsMap.get(key);
+
+			if (!session) {
+				continue;
 			}
+
+			if (row.isRight === true) {
+				session.rightAnswers++;
+			}
+			session.totalSubmits++;
 		}
 
 		const sessions = Array.from(sessionsMap.values());
@@ -265,24 +273,12 @@ export class QuizService {
 					};
 				}
 
-				const percentSolved =
-					totalQuestions > 0
-						? Math.round((session.totalSubmits / totalQuestions) * 100 * 100) /
-							100
-						: 0;
-				const percentRight =
-					session.totalSubmits > 0
-						? Math.round(
-								(session.rightAnswers / session.totalSubmits) * 100 * 100,
-							) / 100
-						: 0;
-
 				acc[userId].sessions.push({
 					id: session.sessionId,
 					timeStart: session.timeStart,
 					timeEnd: session.timeEnd,
-					percentSolved,
-					percentRight,
+					rightAnswers: session.rightAnswers,
+					totalSubmits: session.totalSubmits,
 				});
 				return acc;
 			},
@@ -296,8 +292,8 @@ export class QuizService {
 						id: string;
 						timeStart: Date | null;
 						timeEnd: Date | null;
-						percentSolved: number;
-						percentRight: number;
+						rightAnswers: number;
+						totalSubmits: number;
 					}>;
 				}
 			>,

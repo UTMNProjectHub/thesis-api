@@ -1,9 +1,14 @@
 import { and, count, eq, isNull } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
-import { quizes, quizSession, sessionSubmits } from "../../db/schema";
+import {
+	questionSubmissions,
+	quizes,
+	quizSession,
+	sessionSubmits,
+} from "../../db/schema";
 
-type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class SessionService {
 	async getSession(sessionId: string) {
@@ -262,5 +267,31 @@ export class SessionService {
 				submitId,
 			})),
 		);
+	}
+
+	async recordQuestionSubmissionInTransaction(
+		tx: Transaction,
+		sessionId: string,
+		questionId: string,
+		isRight: boolean | null,
+	) {
+		try {
+			await tx.insert(questionSubmissions).values({
+				sessionId,
+				questionId,
+				isRight,
+			});
+		} catch (err) {
+			if (
+				(
+					err as {
+						code?: string;
+					}
+				).code === "23505"
+			) {
+				throw status(409, "Question already answered in this session");
+			}
+			throw err;
+		}
 	}
 }

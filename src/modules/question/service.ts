@@ -1,14 +1,15 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../../db";
 import {
 	chosenVariants,
+	questionSubmissions,
 	questions,
 	questionsVariants,
 	sessionSubmits,
 	variants,
 } from "../../db/schema";
-import { SessionService } from "../session/service";
+import { SessionService, type Transaction } from "../session/service";
 import type { AnswerPair } from "./types";
 
 export class QuestionService {
@@ -45,14 +46,23 @@ export class QuestionService {
 				questionsVariantsId: questionsVariants.id,
 			})
 			.from(variants)
-			.innerJoin(questionsVariants, eq(variants.id, questionsVariants.variantId))
+			.innerJoin(
+				questionsVariants,
+				eq(variants.id, questionsVariants.variantId),
+			)
 			.where(eq(questionsVariants.questionId, questionId));
 	}
 
 	/** Throws 409 if student already answered this question in the given session. */
-	private async assertNoDuplicateSubmit(sessionId: string, questionId: string) {
-		const duplicate = await db
-			.select({ id: chosenVariants.id })
+	private async assertNoDuplicateSubmit(
+		tx: Transaction,
+		sessionId: string,
+		questionId: string,
+	) {
+		const duplicate = await tx
+			.select({
+				id: chosenVariants.id,
+			})
 			.from(chosenVariants)
 			.innerJoin(sessionSubmits, eq(sessionSubmits.submitId, chosenVariants.id))
 			.where(
@@ -66,6 +76,19 @@ export class QuestionService {
 		if (duplicate.length > 0) {
 			throw status(409, "Question already answered in this session");
 		}
+	}
+
+	private async lockSubmissionSlot(
+		tx: Transaction,
+		sessionId: string,
+		questionId: string,
+	) {
+		await tx.execute(sql`
+			SELECT pg_advisory_xact_lock(
+				hashtext(${sessionId}::text),
+				hashtext(${questionId}::text)
+			)
+		`);
 	}
 
 	async submitQuestionVariants(
@@ -121,8 +144,6 @@ export class QuestionService {
 			);
 		}
 
-		await this.assertNoDuplicateSubmit(session.id, questionId);
-
 		// For multichoice: all selected must be correct AND all correct must be selected
 		const correctVariantIds = new Set(
 			variantsQuery
@@ -132,8 +153,12 @@ export class QuestionService {
 		);
 		const selectedSet = new Set(variantIds);
 		const overallIsRight =
-			[...selectedSet].every((id) => correctVariantIds.has(id)) &&
-			[...correctVariantIds].every((id) => selectedSet.has(id));
+			[
+				...selectedSet,
+			].every((id) => correctVariantIds.has(id)) &&
+			[
+				...correctVariantIds,
+			].every((id) => selectedSet.has(id));
 
 		const chosenVariantsArr = variantIds.map((variantId) => {
 			const questionVariant = variantsQuery.find((v) => v.id === variantId);
@@ -152,6 +177,9 @@ export class QuestionService {
 		});
 
 		const inserted = await db.transaction(async (tx) => {
+			await this.lockSubmissionSlot(tx, session.id, questionId);
+			await this.assertNoDuplicateSubmit(tx, session.id, questionId);
+
 			const rows = await tx
 				.insert(chosenVariants)
 				.values(chosenVariantsArr)
@@ -161,6 +189,13 @@ export class QuestionService {
 				tx,
 				session.id,
 				rows.map((cv) => cv.id),
+			);
+
+			await this.sessionService.recordQuestionSubmissionInTransaction(
+				tx,
+				session.id,
+				questionId,
+				overallIsRight,
 			);
 
 			return rows;
@@ -204,7 +239,11 @@ export class QuestionService {
 			quizId,
 		);
 
-		const textQuestionTypes = ["shortanswer", "essay", "numerical"];
+		const textQuestionTypes = [
+			"shortanswer",
+			"essay",
+			"numerical",
+		];
 		if (!textQuestionTypes.includes(questionQuery.type)) {
 			throw status(
 				400,
@@ -226,8 +265,6 @@ export class QuestionService {
 			}
 		}
 
-		await this.assertNoDuplicateSubmit(session.id, questionId);
-
 		let isRight: boolean | null = null;
 		let explanation: string | null = null;
 
@@ -244,6 +281,9 @@ export class QuestionService {
 		}
 
 		const [submitted] = await db.transaction(async (tx) => {
+			await this.lockSubmissionSlot(tx, session.id, questionId);
+			await this.assertNoDuplicateSubmit(tx, session.id, questionId);
+
 			const [inserted] = await tx
 				.insert(chosenVariants)
 				.values({
@@ -258,10 +298,21 @@ export class QuestionService {
 			await this.sessionService.addSubmitsToSessionInTransaction(
 				tx,
 				session.id,
-				[inserted.id],
+				[
+					inserted.id,
+				],
 			);
 
-			return [inserted];
+			await this.sessionService.recordQuestionSubmissionInTransaction(
+				tx,
+				session.id,
+				questionId,
+				isRight,
+			);
+
+			return [
+				inserted,
+			];
 		});
 
 		return {
@@ -292,8 +343,6 @@ export class QuestionService {
 				"Bad Request: this method only supports matching questions",
 			);
 		}
-
-		await this.assertNoDuplicateSubmit(session.id, questionId);
 
 		const pairsMap = answerPairs.reduce(
 			(acc, pair) => {
@@ -326,6 +375,9 @@ export class QuestionService {
 		});
 
 		const insertedRows = await db.transaction(async (tx) => {
+			await this.lockSubmissionSlot(tx, session.id, questionId);
+			await this.assertNoDuplicateSubmit(tx, session.id, questionId);
+
 			const rows = await tx
 				.insert(chosenVariants)
 				.values(chosenVariantsData)
@@ -336,6 +388,13 @@ export class QuestionService {
 				tx,
 				session.id,
 				rows.map((cv) => cv.id),
+			);
+
+			await this.sessionService.recordQuestionSubmissionInTransaction(
+				tx,
+				session.id,
+				questionId,
+				overallIsRight,
 			);
 
 			return rows;
@@ -357,26 +416,75 @@ export class QuestionService {
 		isRight: boolean,
 		explanation?: string,
 	) {
-		const existing = await db.query.chosenVariants.findFirst({
-			where: eq(chosenVariants.id, submissionId),
+		return await db.transaction(async (tx) => {
+			const existing = await tx.query.chosenVariants.findFirst({
+				where: eq(chosenVariants.id, submissionId),
+			});
+
+			if (!existing) {
+				throw status(404, "Submission not found");
+			}
+
+			const updateData: {
+				isRight: boolean;
+				explanation?: string;
+			} = {
+				isRight,
+			};
+			if (explanation !== undefined) {
+				updateData.explanation = explanation;
+			}
+
+			const [updated] = await tx
+				.update(chosenVariants)
+				.set(updateData)
+				.where(eq(chosenVariants.id, submissionId))
+				.returning();
+
+			const link = await tx.query.sessionSubmits.findFirst({
+				where: eq(sessionSubmits.submitId, submissionId),
+				columns: {
+					sessionId: true,
+				},
+			});
+
+			if (link) {
+				const siblings = await tx
+					.select({
+						isRight: chosenVariants.isRight,
+					})
+					.from(chosenVariants)
+					.innerJoin(
+						sessionSubmits,
+						eq(sessionSubmits.submitId, chosenVariants.id),
+					)
+					.where(
+						and(
+							eq(sessionSubmits.sessionId, link.sessionId),
+							eq(chosenVariants.questionId, existing.questionId),
+						),
+					);
+
+				const anyNull = siblings.some((s) => s.isRight === null);
+				const newIsRight = anyNull
+					? null
+					: siblings.every((s) => s.isRight === true);
+
+				await tx
+					.update(questionSubmissions)
+					.set({
+						isRight: newIsRight,
+					})
+					.where(
+						and(
+							eq(questionSubmissions.sessionId, link.sessionId),
+							eq(questionSubmissions.questionId, existing.questionId),
+						),
+					);
+			}
+
+			return updated;
 		});
-
-		if (!existing) {
-			throw status(404, "Submission not found");
-		}
-
-		const updateData: { isRight: boolean; explanation?: string } = { isRight };
-		if (explanation !== undefined) {
-			updateData.explanation = explanation;
-		}
-
-		const [updated] = await db
-			.update(chosenVariants)
-			.set(updateData)
-			.where(eq(chosenVariants.id, submissionId))
-			.returning();
-
-		return updated;
 	}
 
 	async updateQuestion(
@@ -463,7 +571,9 @@ export class QuestionService {
 			// Delete variants not used by any other question
 			if (existingVariantIds.length > 0) {
 				const stillUsed = await tx
-					.select({ variantId: questionsVariants.variantId })
+					.select({
+						variantId: questionsVariants.variantId,
+					})
 					.from(questionsVariants)
 					.where(inArray(questionsVariants.variantId, existingVariantIds));
 
@@ -499,7 +609,9 @@ export class QuestionService {
 				});
 			}
 
-			return { success: true };
+			return {
+				success: true,
+			};
 		});
 	}
 }

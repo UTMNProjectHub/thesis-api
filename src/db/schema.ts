@@ -5,6 +5,7 @@ import {
 	pgSchema,
 	text,
 	timestamp,
+	unique,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -49,12 +50,20 @@ export const usersToRoles = thesisSchema.table("users_roles", {
 
 export const usersToRolesRelations = relations(usersToRoles, ({ one }) => ({
 	user: one(users, {
-		fields: [usersToRoles.userId],
-		references: [users.id],
+		fields: [
+			usersToRoles.userId,
+		],
+		references: [
+			users.id,
+		],
 	}),
 	role: one(roles, {
-		fields: [usersToRoles.roleId],
-		references: [roles.id],
+		fields: [
+			usersToRoles.roleId,
+		],
+		references: [
+			roles.id,
+		],
 	}),
 }));
 
@@ -91,12 +100,20 @@ export const rolesToPermissionsRelations = relations(
 	rolesToPermissions,
 	({ one }) => ({
 		role: one(roles, {
-			fields: [rolesToPermissions.roleId],
-			references: [roles.id],
+			fields: [
+				rolesToPermissions.roleId,
+			],
+			references: [
+				roles.id,
+			],
 		}),
 		permission: one(permissions, {
-			fields: [rolesToPermissions.permissionId],
-			references: [permissions.id],
+			fields: [
+				rolesToPermissions.permissionId,
+			],
+			references: [
+				permissions.id,
+			],
 		}),
 	}),
 );
@@ -122,14 +139,20 @@ export const quizes = thesisSchema.table("quizes", {
 	maxSessions: integer().notNull().default(1),
 	description: text().notNull(),
 	themeId: integer().references(() => themes.id),
-	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
+	summaryId: integer().references(() => summaries.id, {
+		onDelete: "cascade",
+	}),
 	createdAt: timestamp().notNull().defaultNow(),
 });
 
 export const quizesRelations = relations(quizes, ({ one, many }) => ({
 	theme: one(themes, {
-		fields: [quizes.themeId],
-		references: [themes.id],
+		fields: [
+			quizes.themeId,
+		],
+		references: [
+			themes.id,
+		],
 	}),
 	quizesQuestions: many(quizesQuestions),
 	usersQuizes: many(usersQuizes),
@@ -173,12 +196,20 @@ export const quizesQuestionsRelations = relations(
 	quizesQuestions,
 	({ one }) => ({
 		quiz: one(quizes, {
-			fields: [quizesQuestions.quizId],
-			references: [quizes.id],
+			fields: [
+				quizesQuestions.quizId,
+			],
+			references: [
+				quizes.id,
+			],
 		}),
 		question: one(questions, {
-			fields: [quizesQuestions.questionId],
-			references: [questions.id],
+			fields: [
+				quizesQuestions.questionId,
+			],
+			references: [
+				questions.id,
+			],
 		}),
 	}),
 );
@@ -198,12 +229,20 @@ export const usersQuizes = thesisSchema.table("users_quizes", {
 
 export const usersQuizesRelations = relations(usersQuizes, ({ one }) => ({
 	user: one(users, {
-		fields: [usersQuizes.userId],
-		references: [users.id],
+		fields: [
+			usersQuizes.userId,
+		],
+		references: [
+			users.id,
+		],
 	}),
 	quiz: one(quizes, {
-		fields: [usersQuizes.quizId],
-		references: [quizes.id],
+		fields: [
+			usersQuizes.quizId,
+		],
+		references: [
+			quizes.id,
+		],
 	}),
 }));
 
@@ -226,12 +265,20 @@ export const quizSession = thesisSchema.table("quiz_session", {
 
 export const quizSessionRelations = relations(quizSession, ({ one, many }) => ({
 	quiz: one(quizes, {
-		fields: [quizSession.quizId],
-		references: [quizes.id],
+		fields: [
+			quizSession.quizId,
+		],
+		references: [
+			quizes.id,
+		],
 	}),
 	user: one(users, {
-		fields: [quizSession.userId],
-		references: [users.id],
+		fields: [
+			quizSession.userId,
+		],
+		references: [
+			users.id,
+		],
 	}),
 	sessionSubmits: many(sessionSubmits),
 }));
@@ -253,14 +300,50 @@ export const sessionSubmits = thesisSchema.table("session_submits", {
 
 export const sessionSubmitsRelations = relations(sessionSubmits, ({ one }) => ({
 	session: one(quizSession, {
-		fields: [sessionSubmits.sessionId],
-		references: [quizSession.id],
+		fields: [
+			sessionSubmits.sessionId,
+		],
+		references: [
+			quizSession.id,
+		],
 	}),
 	submit: one(chosenVariants, {
-		fields: [sessionSubmits.submitId],
-		references: [chosenVariants.id],
+		fields: [
+			sessionSubmits.submitId,
+		],
+		references: [
+			chosenVariants.id,
+		],
 	}),
 }));
+
+export const questionSubmissions = thesisSchema.table(
+	"question_submissions",
+	{
+		id: uuid()
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		sessionId: uuid()
+			.notNull()
+			.references(() => quizSession.id, {
+				onDelete: "cascade",
+				onUpdate: "cascade",
+			}),
+		questionId: uuid()
+			.notNull()
+			.references(() => questions.id, {
+				onDelete: "cascade",
+				onUpdate: "cascade",
+			}),
+		isRight: boolean(),
+		submittedAt: timestamp().notNull().defaultNow(),
+	},
+	(t) => ({
+		sessionQuestionUnique: unique(
+			"question_submissions_session_question_unique",
+		).on(t.sessionId, t.questionId),
+	}),
+);
 
 export const chosenVariants = thesisSchema.table("chosen_variants", {
 	id: uuid()
@@ -293,16 +376,28 @@ export const chosenVariantsRelations = relations(
 	chosenVariants,
 	({ one, many }) => ({
 		quiz: one(quizes, {
-			fields: [chosenVariants.quizId],
-			references: [quizes.id],
+			fields: [
+				chosenVariants.quizId,
+			],
+			references: [
+				quizes.id,
+			],
 		}),
 		question: one(questions, {
-			fields: [chosenVariants.questionId],
-			references: [questions.id],
+			fields: [
+				chosenVariants.questionId,
+			],
+			references: [
+				questions.id,
+			],
 		}),
 		chosenVariant: one(questionsVariants, {
-			fields: [chosenVariants.chosenId],
-			references: [questionsVariants.id],
+			fields: [
+				chosenVariants.chosenId,
+			],
+			references: [
+				questionsVariants.id,
+			],
 		}),
 		sessionSubmits: many(sessionSubmits),
 	}),
@@ -338,12 +433,20 @@ export const questionsVariantsRelations = relations(
 	questionsVariants,
 	({ one }) => ({
 		question: one(questions, {
-			fields: [questionsVariants.questionId],
-			references: [questions.id],
+			fields: [
+				questionsVariants.questionId,
+			],
+			references: [
+				questions.id,
+			],
 		}),
 		variant: one(variants, {
-			fields: [questionsVariants.variantId],
-			references: [variants.id],
+			fields: [
+				questionsVariants.variantId,
+			],
+			references: [
+				variants.id,
+			],
 		}),
 	}),
 );
@@ -360,7 +463,9 @@ export const referencesQuiz = thesisSchema.table("references_quiz", {
 		}),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 	userId: uuid()
 		.notNull()
 		.references(() => users.id),
@@ -368,16 +473,28 @@ export const referencesQuiz = thesisSchema.table("references_quiz", {
 
 export const referencesQuizRelations = relations(referencesQuiz, ({ one }) => ({
 	quiz: one(quizes, {
-		fields: [referencesQuiz.quizId],
-		references: [quizes.id],
+		fields: [
+			referencesQuiz.quizId,
+		],
+		references: [
+			quizes.id,
+		],
 	}),
 	file: one(files, {
-		fields: [referencesQuiz.fileId],
-		references: [files.id],
+		fields: [
+			referencesQuiz.fileId,
+		],
+		references: [
+			files.id,
+		],
 	}),
 	user: one(users, {
-		fields: [referencesQuiz.userId],
-		references: [users.id],
+		fields: [
+			referencesQuiz.userId,
+		],
+		references: [
+			users.id,
+		],
 	}),
 }));
 
@@ -392,8 +509,12 @@ export const files = thesisSchema.table("files", {
 
 export const filesRelations = relations(files, ({ one, many }) => ({
 	user: one(users, {
-		fields: [files.userId],
-		references: [users.id],
+		fields: [
+			files.userId,
+		],
+		references: [
+			users.id,
+		],
 	}),
 	referencesQuiz: many(referencesQuiz),
 	referencesQuestion: many(referencesQuestion),
@@ -412,19 +533,29 @@ export const referencesQuestion = thesisSchema.table("references_question", {
 		.references(() => questions.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 });
 
 export const referencesQuestionRelations = relations(
 	referencesQuestion,
 	({ one }) => ({
 		question: one(questions, {
-			fields: [referencesQuestion.questionId],
-			references: [questions.id],
+			fields: [
+				referencesQuestion.questionId,
+			],
+			references: [
+				questions.id,
+			],
 		}),
 		file: one(files, {
-			fields: [referencesQuestion.fileId],
-			references: [files.id],
+			fields: [
+				referencesQuestion.fileId,
+			],
+			references: [
+				files.id,
+			],
 		}),
 	}),
 );
@@ -446,19 +577,29 @@ export const subjectsRelations = relations(subjects, ({ many }) => ({
 export const referencesSubject = thesisSchema.table("references_subject", {
 	id: integer().generatedByDefaultAsIdentity().primaryKey(),
 	subjectId: integer().references(() => subjects.id),
-	fileId: uuid().references(() => files.id, { onDelete: "cascade" }),
+	fileId: uuid().references(() => files.id, {
+		onDelete: "cascade",
+	}),
 });
 
 export const referencesSubjectRelations = relations(
 	referencesSubject,
 	({ one }) => ({
 		subject: one(subjects, {
-			fields: [referencesSubject.subjectId],
-			references: [subjects.id],
+			fields: [
+				referencesSubject.subjectId,
+			],
+			references: [
+				subjects.id,
+			],
 		}),
 		file: one(files, {
-			fields: [referencesSubject.fileId],
-			references: [files.id],
+			fields: [
+				referencesSubject.fileId,
+			],
+			references: [
+				files.id,
+			],
 		}),
 	}),
 );
@@ -474,8 +615,12 @@ export const themes = thesisSchema.table("themes", {
 
 export const themesRelations = relations(themes, ({ one, many }) => ({
 	subject: one(subjects, {
-		fields: [themes.subjectId],
-		references: [subjects.id],
+		fields: [
+			themes.subjectId,
+		],
+		references: [
+			subjects.id,
+		],
 	}),
 	quizzes: many(quizes),
 	referencesTheme: many(referencesTheme),
@@ -489,19 +634,29 @@ export const referencesTheme = thesisSchema.table("references_theme", {
 		.references(() => themes.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 });
 
 export const referencesThemeRelations = relations(
 	referencesTheme,
 	({ one }) => ({
 		theme: one(themes, {
-			fields: [referencesTheme.themeId],
-			references: [themes.id],
+			fields: [
+				referencesTheme.themeId,
+			],
+			references: [
+				themes.id,
+			],
 		}),
 		file: one(files, {
-			fields: [referencesTheme.fileId],
-			references: [files.id],
+			fields: [
+				referencesTheme.fileId,
+			],
+			references: [
+				files.id,
+			],
 		}),
 	}),
 );
@@ -513,44 +668,70 @@ export const summaries = thesisSchema.table("summaries", {
 	themeId: integer().references(() => themes.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 	createdAt: timestamp().notNull().defaultNow(),
 });
 
 export const referencesSummary = thesisSchema.table("references_summary", {
 	id: integer().generatedByDefaultAsIdentity().primaryKey(),
-	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
+	summaryId: integer().references(() => summaries.id, {
+		onDelete: "cascade",
+	}),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 });
 
 export const referencesSummaryRelations = relations(
 	referencesSummary,
 	({ one }) => ({
 		summary: one(summaries, {
-			fields: [referencesSummary.summaryId],
-			references: [summaries.id],
+			fields: [
+				referencesSummary.summaryId,
+			],
+			references: [
+				summaries.id,
+			],
 		}),
 		file: one(files, {
-			fields: [referencesSummary.fileId],
-			references: [files.id],
+			fields: [
+				referencesSummary.fileId,
+			],
+			references: [
+				files.id,
+			],
 		}),
 	}),
 );
 
 export const summariesRelations = relations(summaries, ({ one, many }) => ({
 	subject: one(subjects, {
-		fields: [summaries.subjectId],
-		references: [subjects.id],
+		fields: [
+			summaries.subjectId,
+		],
+		references: [
+			subjects.id,
+		],
 	}),
 	theme: one(themes, {
-		fields: [summaries.themeId],
-		references: [themes.id],
+		fields: [
+			summaries.themeId,
+		],
+		references: [
+			themes.id,
+		],
 	}),
 	file: one(files, {
-		fields: [summaries.fileId],
-		references: [files.id],
+		fields: [
+			summaries.fileId,
+		],
+		references: [
+			files.id,
+		],
 	}),
 	referencesSummary: many(referencesSummary),
 	faqs: many(faqs),
@@ -564,23 +745,39 @@ export const faqs = thesisSchema.table("faqs", {
 	difficultyLevel: varchar().notNull(),
 	num_questions: integer().notNull(),
 	fileId: uuid()
-		.references(() => files.id, { onDelete: "cascade" })
+		.references(() => files.id, {
+			onDelete: "cascade",
+		})
 		.notNull(),
-	summaryId: integer().references(() => summaries.id, { onDelete: "cascade" }),
+	summaryId: integer().references(() => summaries.id, {
+		onDelete: "cascade",
+	}),
 });
 
 export const faqsRelations = relations(faqs, ({ one, many }) => ({
 	theme: one(themes, {
-		fields: [faqs.themeId],
-		references: [themes.id],
+		fields: [
+			faqs.themeId,
+		],
+		references: [
+			themes.id,
+		],
 	}),
 	file: one(files, {
-		fields: [faqs.fileId],
-		references: [files.id],
+		fields: [
+			faqs.fileId,
+		],
+		references: [
+			files.id,
+		],
 	}),
 	summary: one(summaries, {
-		fields: [faqs.summaryId],
-		references: [summaries.id],
+		fields: [
+			faqs.summaryId,
+		],
+		references: [
+			summaries.id,
+		],
 	}),
 	referencesFaq: many(referencesFaq),
 }));
@@ -590,16 +787,26 @@ export const referencesFaq = thesisSchema.table("references_faq", {
 	faqId: uuid().references(() => faqs.id),
 	fileId: uuid()
 		.notNull()
-		.references(() => files.id, { onDelete: "cascade" }),
+		.references(() => files.id, {
+			onDelete: "cascade",
+		}),
 });
 
 export const referencesFaqRelations = relations(referencesFaq, ({ one }) => ({
 	faq: one(faqs, {
-		fields: [referencesFaq.faqId],
-		references: [faqs.id],
+		fields: [
+			referencesFaq.faqId,
+		],
+		references: [
+			faqs.id,
+		],
 	}),
 	file: one(files, {
-		fields: [referencesFaq.fileId],
-		references: [files.id],
+		fields: [
+			referencesFaq.fileId,
+		],
+		references: [
+			files.id,
+		],
 	}),
 }));
