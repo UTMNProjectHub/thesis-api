@@ -7,17 +7,14 @@ import { questionSubmissions } from "../../db/schema";
 import { QuestionChatService } from "./service";
 
 export const questionChatModule = new Elysia({
-	prefix: "/questions/chat",
+	prefix: "/questions-chat",
 })
 	.use(authMacro)
 	.decorate("QuestionChatService", new QuestionChatService())
 	.get(
 		"/",
-		async ({
-			query: { questionId, sessionId },
-			QuestionChatService,
-			userId,
-		}) => QuestionChatService.getMessages(questionId, userId, sessionId),
+		async ({ query: { questionId, sessionId }, QuestionChatService, userId }) =>
+			QuestionChatService.getMessages(questionId, userId, sessionId),
 		{
 			query: t.Object({
 				questionId: t.String({ format: "uuid" }),
