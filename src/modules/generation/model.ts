@@ -25,7 +25,7 @@ export const QuizGenBody = t.Object({
 			t.Literal("numerical"),
 		]),
 	),
-	summaryId: t.Optional(t.String({ format: "uuid" })),
+	summaryId: t.Optional(t.Number()),
 	additional_requirements: t.Optional(t.String()),
 });
 
