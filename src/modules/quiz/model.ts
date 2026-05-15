@@ -2,7 +2,14 @@ import { createSelectSchema } from "drizzle-typebox";
 import { t } from "elysia";
 import { quizes } from "../../db/schema";
 
-const plainQuiz = createSelectSchema(quizes);
+const quizSelectSchema = createSelectSchema(quizes);
+
+const plainQuiz = t.Intersect([
+	quizSelectSchema,
+	t.Object({
+		questionCount: t.Optional(t.Number()),
+	}),
+]);
 
 export const UpdateQuizBody = t.Object({
 	name: t.Optional(t.String()),
