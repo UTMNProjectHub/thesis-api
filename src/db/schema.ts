@@ -754,6 +754,7 @@ export const faqs = thesisSchema.table("faqs", {
 	summaryId: integer().references(() => summaries.id, {
 		onDelete: "cascade",
 	}),
+	createdAt: timestamp().notNull().defaultNow(),
 });
 
 export const faqsRelations = relations(faqs, ({ one, many }) => ({
